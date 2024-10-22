@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express()
-const PORT = process.env.port;
+const PORT = process.env.LISTEN_PORT;
 
 const admin_accounts = require('./models/admin_accounts.model');
 
