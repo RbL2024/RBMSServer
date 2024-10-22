@@ -72,3 +72,7 @@ build/Release
 # Other files
 *.pid.lock
 *.seed
+.env*
+.flaskenv*
+!.env.project
+!.env.vault
