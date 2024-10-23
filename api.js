@@ -77,18 +77,34 @@ const bike_info = require('./models/bike_info.model');
 app.post('/uploadBikeInfo' ,async (req, res) => {
     try {
         const data = req.body;
+
+        const result = await cloudinary.uploader.upload(data.i_bike_image_url, {
+            folder: 'bikeImages' // Optional: specify a folder in Cloudinary
+        });
+
+        // if(result){
+        //     const bikeInfo = await bike_info({
+        //         bike_number: data.i_bike_number,
+        //         bike_name: data.i_bike_name,
+        //         bike_type: data.i_bike_type,
+        //         bike_rent_price: data.i_bike_rent_price,
+        //         bike_desc: data.i_bike_desc,
+        //         bike_image_url: result.secure_url
+        //     });
+        //     await bikeInfo.save();
+        // }
         const bikeInfo = await bike_info({
-            bike_number: i_bike_number,
-            bike_name: i_bike_name,
-            bike_type: i_bike_type,
-            bike_rent_price: i_bike_rent_price,
-            bike_desc: i_bike_desc,
-            bike_image_url: i_bike_image_url
+            bike_number: data.i_bike_number,
+            bike_name: data.i_bike_name,
+            bike_type: data.i_bike_type,
+            bike_rent_price: data.i_bike_rent_price,
+            bike_desc: data.i_bike_desc,
+            bike_image_url: result.secure_url
         });
         await bikeInfo.save();
         res.status(201).send({ message: 'Bike uploaded successfully' });
     } catch (error) {
-        console.error('Error creating account:', err);
+        console.error('Error creating account:', error);
         res.status(500).send({ message: 'Error creating account' });
     }
 })

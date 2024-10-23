@@ -22,6 +22,14 @@ const bike_info_schema = new mongoose.Schema({
     },
     bike_image_url: {
         type: String
+    },
+    isRented: {
+        type: Boolean,
+        default: false
+    },
+    isReserved: {
+        type: Boolean,
+        default: false
     }
 })
 
