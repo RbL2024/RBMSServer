@@ -1,6 +1,13 @@
 require('./dbconn');
 const express = require('express');
 const cors = require('cors');
+const cloudinary = require('cloudinary').v2
+require('dotenv').config();
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUDNAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 const app = express()
 const PORT = process.env.LISTEN_PORT;
@@ -44,11 +51,11 @@ app.post('/findAccount', async (req, res) => {
 
 app.post('/createAccount', async (req, res) => {
     try {
-        const data = req.body
+        const data = req.body;
         console.log(data.i_username);
         const createAcc = admin_accounts({
             a_first_name: data.i_firstname,
-            a_middle_name: data.i_mniddle,
+            a_middle_name: data.i_middle,
             a_last_name: data.i_lastname,
             a_address: data.i_address,
             a_contactnum: data.i_contactnum,
@@ -63,6 +70,29 @@ app.post('/createAccount', async (req, res) => {
         res.status(500).send({ message: 'Error creating account' });
     }
 })
+
+
+const bike_info = require('./models/bike_info.model');
+
+app.post('/uploadBikeInfo' ,async (req, res) => {
+    try {
+        const data = req.body;
+        const bikeInfo = await bike_info({
+            bike_number: i_bike_number,
+            bike_name: i_bike_name,
+            bike_type: i_bike_type,
+            bike_rent_price: i_bike_rent_price,
+            bike_desc: i_bike_desc,
+            bike_image_url: i_bike_image_url
+        });
+        await bikeInfo.save();
+        res.status(201).send({ message: 'Bike uploaded successfully' });
+    } catch (error) {
+        console.error('Error creating account:', err);
+        res.status(500).send({ message: 'Error creating account' });
+    }
+})
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
