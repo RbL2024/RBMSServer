@@ -14,7 +14,7 @@ const bike_info_schema = new mongoose.Schema({
         required: true
     },
     bike_rent_price: {
-        type: Number,
+        type: String,
         required: true
     },
     bike_desc: {

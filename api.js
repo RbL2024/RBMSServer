@@ -1,13 +1,7 @@
 require('./dbconn');
 const express = require('express');
 const cors = require('cors');
-const cloudinary = require('cloudinary').v2
 require('dotenv').config();
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUDNAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
 
 const app = express()
 const PORT = process.env.LISTEN_PORT;
@@ -16,11 +10,13 @@ const admin_accounts = require('./models/admin_accounts.model');
 
 app.use(cors());
 app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 //API HERE
 app.get('/fetchAdminAccounts', async (req, res) => {
     try {
-        const fetchedAcc = await admin_accounts.find({isSuperAdmin:{$ne: true}});
+        const fetchedAcc = await admin_accounts.find({ isSuperAdmin: { $ne: true } });
         // res.json(fetchedAcc);
         res.send(fetchedAcc);
     } catch (error) {
@@ -35,7 +31,7 @@ app.post('/findAccount', async (req, res) => {
         const foundAcc = await admin_accounts.findOne({ a_username: dataInp.i_username })
         if (foundAcc) {
             if (dataInp.i_password === foundAcc.a_password) {
-                res.send({ isFound: true, uName:  foundAcc.a_first_name, isSAdmin: foundAcc.isSuperAdmin });
+                res.send({ isFound: true, uName: foundAcc.a_first_name, isSAdmin: foundAcc.isSuperAdmin });
 
             } else {
                 res.send({ isFound: false })
@@ -74,38 +70,23 @@ app.post('/createAccount', async (req, res) => {
 
 const bike_info = require('./models/bike_info.model');
 
-app.post('/uploadBikeInfo' ,async (req, res) => {
+app.post('/uploadBikeInfo', async (req, res) => {
     try {
         const data = req.body;
 
-        const result = await cloudinary.uploader.upload(data.i_bike_image_url, {
-            folder: 'bikeImages' // Optional: specify a folder in Cloudinary
-        });
-
-        // if(result){
-        //     const bikeInfo = await bike_info({
-        //         bike_number: data.i_bike_number,
-        //         bike_name: data.i_bike_name,
-        //         bike_type: data.i_bike_type,
-        //         bike_rent_price: data.i_bike_rent_price,
-        //         bike_desc: data.i_bike_desc,
-        //         bike_image_url: result.secure_url
-        //     });
-        //     await bikeInfo.save();
-        // }
         const bikeInfo = await bike_info({
             bike_number: data.i_bike_number,
             bike_name: data.i_bike_name,
             bike_type: data.i_bike_type,
             bike_rent_price: data.i_bike_rent_price,
             bike_desc: data.i_bike_desc,
-            bike_image_url: result.secure_url
+            bike_image_url: data.i_bike_image_url
         });
         await bikeInfo.save();
         res.status(201).send({ message: 'Bike uploaded successfully' });
     } catch (error) {
-        console.error('Error creating account:', error);
-        res.status(500).send({ message: 'Error creating account' });
+        console.error('Error uploading bike:', error);
+        res.status(500).send({ message: 'Error uploading bike' });
     }
 })
 
