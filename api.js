@@ -82,8 +82,13 @@ app.post('/uploadBikeInfo', async (req, res) => {
             bike_desc: data.i_bike_desc,
             bike_image_url: data.i_bike_image_url
         });
-        await bikeInfo.save();
-        res.status(201).send({ message: 'Bike uploaded successfully' });
+        
+        const savedBikeInfo = await bikeInfo.save();
+        (savedBikeInfo)
+        ?( res.status(201).send({ message: 'Bike uploaded successfully', isUploaded:true }))
+        :( res.send({ message: 'Error uploading bike', isUploaded:false }))
+
+        // res.status(201).send({ message: 'Bike uploaded successfully',  });
     } catch (error) {
         console.error('Error uploading bike:', error);
         res.status(500).send({ message: 'Error uploading bike' });
