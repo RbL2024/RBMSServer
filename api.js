@@ -1,6 +1,7 @@
 require('./dbconn');
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcrypt');
 require('dotenv').config();
 
 const app = express()
@@ -30,7 +31,9 @@ app.post('/findAccount', async (req, res) => {
         const dataInp = req.body;
         const foundAcc = await admin_accounts.findOne({ a_username: dataInp.i_username })
         if (foundAcc) {
-            if (dataInp.i_password === foundAcc.a_password) {
+            const match = await bcrypt.compare(dataInp.i_password, foundAcc.a_password);
+
+            if (match) {
                 res.send({ isFound: true, uName: foundAcc.a_first_name, isSAdmin: foundAcc.isSuperAdmin });
 
             } else {
@@ -40,7 +43,7 @@ app.post('/findAccount', async (req, res) => {
             res.send({ isFound: false })
         }
     } catch (error) {
-        onsole.error('Error finding user:', error);
+        console.error('Error finding user:', error);
         res.status(400).send({ message: 'Error finding user', error: error });
     }
 })
@@ -48,7 +51,9 @@ app.post('/findAccount', async (req, res) => {
 app.post('/createAccount', async (req, res) => {
     try {
         const data = req.body;
-        console.log(data.i_username);
+
+        const hashedPassword = await bcrypt.hash(data.i_password, 10);
+
         const createAcc = admin_accounts({
             a_first_name: data.i_firstname,
             a_middle_name: data.i_middle,
@@ -57,12 +62,12 @@ app.post('/createAccount', async (req, res) => {
             a_contactnum: data.i_contactnum,
             a_email: data.i_email,
             a_username: data.i_username,
-            a_password: data.i_password
+            a_password: hashedPassword
         })
         await createAcc.save();
         res.status(201).send({ message: 'User created successfully' });
     } catch (error) {
-        console.error('Error creating account:', err);
+        console.error('Error creating account:', error);
         res.status(500).send({ message: 'Error creating account' });
     }
 })
