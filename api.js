@@ -75,23 +75,33 @@ app.post('/uploadBikeInfo', async (req, res) => {
         const data = req.body;
 
         const bikeInfo = await bike_info({
-            bike_number: data.i_bike_number,
+            bike_id: data.i_bike_id,
             bike_name: data.i_bike_name,
             bike_type: data.i_bike_type,
             bike_rent_price: data.i_bike_rent_price,
             bike_desc: data.i_bike_desc,
             bike_image_url: data.i_bike_image_url
         });
-        
+
         const savedBikeInfo = await bikeInfo.save();
         (savedBikeInfo)
-        ?( res.status(201).send({ message: 'Bike uploaded successfully', isUploaded:true }))
-        :( res.send({ message: 'Error uploading bike', isUploaded:false }))
+            ? (res.status(201).send({ message: 'Bike uploaded successfully', isUploaded: true }))
+            : (res.send({ message: 'Error uploading bike', isUploaded: false }))
 
         // res.status(201).send({ message: 'Bike uploaded successfully',  });
     } catch (error) {
         console.error('Error uploading bike:', error);
         res.status(500).send({ message: 'Error uploading bike' });
+    }
+})
+
+app.get('/fetchAllBikes', async (req, res) => {
+    try {
+        const bikeInfo = await bike_info.find(); 
+
+        res.status(200).send(bikeInfo);
+    } catch (error) {
+        console.error('Error fetching all bikes:', error);
     }
 })
 

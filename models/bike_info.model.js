@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const bike_info_schema = new mongoose.Schema({
-    bike_number: {
+    bike_id: {
         type: String,
         required: true
     },
