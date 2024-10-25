@@ -5,25 +5,37 @@ const mongoose = require('mongoose');
 const admin_accounts_schema = new mongoose.Schema({
     a_first_name: {
         type: String,
+        default: ''
     },
     a_middle_name: {
         type: String,
+        default: ''
     },
     a_last_name: {
-        type: String
+        type: String,
+        default: ''
+    },
+    a_gender: {
+        type: String,
+        default: ''
     },
     a_address: {
         type: String,
+        default: ''
     },
     a_contactnum: {
-        type: Number
+        type: String,
+        default: ''
     },
     a_email: {
-        type: String
+        type: String,
+        required: true,
+        unique: true
     },
     a_username: {
         type: String,
-        required: true
+        required: true,
+        unique: true
     },
     a_password: {
         type: String,
