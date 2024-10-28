@@ -9,6 +9,7 @@ const PORT = process.env.LISTEN_PORT;
 
 const admin_accounts = require('./models/admin_accounts.model');
 const customer_accounts = require('./models/customer_accounts.model');
+const bike_info = require('./models/bike_info.model');
 
 app.use(cors());
 app.use(express.json());
@@ -62,7 +63,6 @@ app.post('/findAccount', async (req, res) => {
                 { a_email: dataInp.i_email }
             ]
         })
-        console.log(foundAcc)
         if (foundAcc) {
             const match = await bcrypt.compare(dataInp.i_password, foundAcc.a_password);
 
@@ -170,7 +170,7 @@ app.put('/updateAccount/:id', async (req, res) => {
 
 
 
-const bike_info = require('./models/bike_info.model');
+
 
 app.post('/uploadBikeInfo', async (req, res) => {
     try {
@@ -199,8 +199,7 @@ app.post('/uploadBikeInfo', async (req, res) => {
 
 app.get('/fetchAllBikes', async (req, res) => {
     try {
-        const bikeInfo = await bike_info.find();
-
+        const bikeInfo = await bike_info.find()
         res.status(200).send(bikeInfo);
     } catch (error) {
         console.error('Error fetching all bikes:', error);
@@ -282,6 +281,30 @@ app.get('/rbmsa/check-connection', async (req, res) => {
     }
 });
 
+app.get('/rbmsa/bikes', async (req, res) => {
+    try {
+        const records = await bike_info.find()
+            .sort({dateAdded: -1})
+            .limit(10);
+        res.json(records);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
@@ -290,7 +313,8 @@ app.listen(PORT, () => {
 
 function makeid(length) {
     let result = '';
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const charactersLength = characters.length;
     let counter = 0;
     while (counter < length) {
