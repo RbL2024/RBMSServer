@@ -8,13 +8,14 @@ const app = express()
 const PORT = process.env.LISTEN_PORT;
 
 const admin_accounts = require('./models/admin_accounts.model');
+const customer_accounts = require('./models/customer_accounts.model');
 
 app.use(cors());
 app.use(express.json());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-//API HERE
+//DESKTOP QUERIES
 app.get('/fetchAdminAccounts', async (req, res) => {
     try {
         const fetchedAcc = await admin_accounts.find({ isSuperAdmin: { $ne: true } });
@@ -55,10 +56,10 @@ app.get('/loggedInAcc/:id', async (req, res) => {
 app.post('/findAccount', async (req, res) => {
     try {
         const dataInp = req.body;
-        const foundAcc = await admin_accounts.findOne({ 
+        const foundAcc = await admin_accounts.findOne({
             $or: [
-                {a_username: dataInp.i_username},
-                {a_email: dataInp.i_email}
+                { a_username: dataInp.i_username },
+                { a_email: dataInp.i_email }
             ]
         })
         console.log(foundAcc)
@@ -84,13 +85,13 @@ app.post('/findDuplication', async (req, res) => {
     try {
         const dataInp = req.body;
         // console.log('Received:', dataInp.i_email, dataInp.i_username);
-        const foundAcc = await admin_accounts.find({$or:[{a_email: dataInp.i_email},  {a_username: dataInp.i_username}]})
+        const foundAcc = await admin_accounts.find({ $or: [{ a_email: dataInp.i_email }, { a_username: dataInp.i_username }] })
 
         console.log(foundAcc)
-        if(foundAcc.length > 0){
-            res.send({isFound: true})
-        }else{
-            res.send({isFound: false})
+        if (foundAcc.length > 0) {
+            res.send({ isFound: true })
+        } else {
+            res.send({ isFound: false })
         }
     } catch (error) {
         console.error('Error finding user:', error);
@@ -140,10 +141,10 @@ app.post('/createAccount', async (req, res) => {
 
         await transporter.sendMail(mailOptions)
 
-        res.status(201).send({ message: 'User created successfully', created:true });
+        res.status(201).send({ message: 'User created successfully', created: true });
     } catch (error) {
         console.error('Error creating account:', error);
-        res.status(500).send({ message: 'Error creating account', created:false });
+        res.status(500).send({ message: 'Error creating account', created: false });
     }
 })
 
@@ -251,15 +252,15 @@ app.put('/updatePassword/:id', async (req, res) => {
     try {
         const id = req.params.id;
         const data = req.body;
-        
+
         const hashedPass = await bcrypt.hash(data.a_password, 10);
         const newPass = {
             a_password: hashedPass
         }
-        const updatePass = await admin_accounts.findByIdAndUpdate(id, newPass,  { new: true });
+        const updatePass = await admin_accounts.findByIdAndUpdate(id, newPass, { new: true });
 
         if (updatePass) {
-            res.status(200).json({ message: 'Password updated successfully',  data: updatePass, pUpdated: true });
+            res.status(200).json({ message: 'Password updated successfully', data: updatePass, pUpdated: true });
 
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -268,6 +269,18 @@ app.put('/updatePassword/:id', async (req, res) => {
         console.error('Error updating password:', error);
     }
 })
+
+
+//ANDROID QUERIES
+app.get('/rbmsa/check-connection', async (req, res) => {
+    try {
+        // Perform a simple query to check the connection
+        const result = await customer_accounts.findOne({});
+        res.status(200).json({ message: 'MongoDB connection is healthy', result });
+    } catch (error) {
+        res.status(500).json({ message: 'MongoDB connection error', error });
+    }
+});
 
 
 app.listen(PORT, () => {
