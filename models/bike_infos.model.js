@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const bike_info_schema = new mongoose.Schema({
+const bike_infos_schema = new mongoose.Schema({
     bike_id: {
         type: String,
         required: true
@@ -23,22 +23,19 @@ const bike_info_schema = new mongoose.Schema({
     bike_image_url: {
         type: String
     },
+    bike_status: {
+        type: String,
+        default: 'vacant'
+    },
     dateAdded: {
         type: Date,
         default: Date.now
-    },
-    isRented: {
-        type: Boolean,
-        default: false
-    },
-    isReserved: {
-        type: Boolean,
-        default: false
     }
+    
 })
 
-const  bike_info = mongoose.model('bike_info', bike_info_schema);
-module.exports = bike_info;
+const  bike_infos = mongoose.model('bike_infos', bike_infos_schema);
+module.exports = bike_infos;
 
 // const generateRandomID = (length) => {
 //     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'; // Possible characters

@@ -1,6 +1,25 @@
 const mongoose = require('mongoose');
 
-// const Fullname =  mongoose.model('Fullname', fullname_schema);
+
+const fAddress_schema = new mongoose.Schema({
+    city: {
+        type: String,
+        required: true
+    },
+    province: {
+        type: String,
+        required: true
+
+    },
+    street: {
+        type: String,
+        required: true
+    },
+    postalCode: {
+        type: String,
+        required: true
+    }
+},{_id:false})
 
 const customer_accounts_schema = new mongoose.Schema({
     c_first_name: {
@@ -15,22 +34,17 @@ const customer_accounts_schema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    c_age: {
+        type: String,
+        default: ''
+    },
+    c_bdate: {
+        type: String,
+        default: ''
+    },
     c_gender: {
         type: String,
         default: ''
-    },
-    c_address: {
-        type: String,
-        default: ''
-    },
-    c_contactnum: {
-        type: String,
-        default: ''
-    },
-    c_email: {
-        type: String,
-        required: true,
-        unique: true
     },
     c_username: {
         type: String,
@@ -40,6 +54,16 @@ const customer_accounts_schema = new mongoose.Schema({
     c_password: {
         type: String,
         required: true
+    },
+    c_full_address: fAddress_schema,
+    c_email: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    c_phone:{
+        type: String,
+        default: ''
     },
     account_created: {
         type: Date,

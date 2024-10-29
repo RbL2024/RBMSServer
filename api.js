@@ -9,7 +9,7 @@ const PORT = process.env.LISTEN_PORT;
 
 const admin_accounts = require('./models/admin_accounts.model');
 const customer_accounts = require('./models/customer_accounts.model');
-const bike_info = require('./models/bike_info.model');
+const bike_infos = require('./models/bike_infos.model');
 
 app.use(cors());
 app.use(express.json());
@@ -20,6 +20,16 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.get('/fetchAdminAccounts', async (req, res) => {
     try {
         const fetchedAcc = await admin_accounts.find({ isSuperAdmin: { $ne: true } });
+        // res.json(fetchedAcc);
+        res.send(fetchedAcc);
+    } catch (error) {
+        console.error('Error fetching users:', err);
+        res.status(500).send({ message: 'Error fetching users' });
+    }
+})
+app.get('/fetchUserAccounts', async (req, res) => {
+    try {
+        const fetchedAcc = await customer_accounts.find();
         // res.json(fetchedAcc);
         res.send(fetchedAcc);
     } catch (error) {
@@ -176,7 +186,7 @@ app.post('/uploadBikeInfo', async (req, res) => {
     try {
         const data = req.body;
 
-        const bikeInfo = await bike_info({
+        const bikeInfo = await bike_infos({
             bike_id: data.i_bike_id,
             bike_name: data.i_bike_name,
             bike_type: data.i_bike_type,
@@ -199,7 +209,7 @@ app.post('/uploadBikeInfo', async (req, res) => {
 
 app.get('/fetchAllBikes', async (req, res) => {
     try {
-        const bikeInfo = await bike_info.find()
+        const bikeInfo = await bike_infos.find()
         res.status(200).send(bikeInfo);
     } catch (error) {
         console.error('Error fetching all bikes:', error);
@@ -281,25 +291,104 @@ app.get('/rbmsa/check-connection', async (req, res) => {
     }
 });
 
-app.get('/rbmsa/bikes', async (req, res) => {
+app.get('/rbmsa/topBikes', async (req, res) => {
     try {
-        const records = await bike_info.find()
-            .sort({dateAdded: -1})
+        const records = await bike_infos.find()
+            .sort({ dateAdded: -1 })
             .limit(10);
         res.json(records);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
 });
+app.post('/rbmsa/typeBikes', async (req, res) => {
+    try {
+        const bikeType = req.body;
+        const records = await bike_infos.find({ bike_type: bikeType.bike_type });
+        res.status(200).json(records);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+app.put('/rbmsa/updateBikeStat/:bikeid', async (req, res) => {
+    try {
+        const bikeId = req.params.bikeid
+        const bikeStat = req.body
+        const updateBikeStat = await bike_infos.findByIdAndUpdate(bikeId, bikeStat);
+        res.status(200).json({ message: 'Bike status updated successfully', data: updateBikeStat });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+})
+
+app.post('/rbmsa/createUser', async (req, res) => {
+    try {
+        const data = req.body;
+
+        const existingUser  = await customer_accounts.findOne({
+            $or: [
+                { c_username: data.i_username },
+                { c_email: data.i_email }
+            ]
+        });
+
+        if (existingUser ) {
+            return res.send({ 
+                message: 'Username or email already exists', 
+                isCreated: false 
+            });
+        }
+        const hashedPass = await bcrypt.hash(data.i_password, 10);
+
+        const user = customer_accounts({
+            c_first_name: data.i_first_name,
+            c_middle_name: data.i_middle_name,
+            c_last_name: data.i_last_name,
+            c_age: data.i_age,
+            c_bdate: data.i_bdate,
+            c_gender: data.i_gender,
+            c_username: data.i_username,
+            c_password: hashedPass,
+            c_full_address: {
+                city: data.i_city,
+                province: data.i_province,
+                street: data.i_street,
+                postalCode: data.i_postalCode
+            },
+            c_email: data.i_email,
+            c_phone: data.i_phone,
+        });
+
+        await user.save();
+        (user)
+            ? (res.status(201).send({ message: 'Account created successfully', isCreated: true }))
+            : (res.send({ message: 'Error creating account', isCreated: false }))
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+})
 
 
-
-
-
-
-
-
-
+app.post('/rbmsa/loginAcc',  async (req, res) => {
+    try {
+        const  { i_username, i_password } = req.body;
+        const findUser = await customer_accounts.findOne({ c_username: i_username });
+        if (!findUser) {
+            return res.send({ message: 'User not found', isFound: false });
+        }else{
+            const isValidPassword = await bcrypt.compare(i_password, findUser.c_password);
+            if (!isValidPassword) {
+                return res.send({ message: 'Invalid password' });
+            }else{
+                return res.send({ message: 'Login successful', isFound: true, loginData:{username:findUser.c_username,password:i_password} });
+            }
+        }
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+})
 
 
 
