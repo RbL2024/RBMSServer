@@ -10,6 +10,7 @@ const PORT = process.env.LISTEN_PORT;
 const admin_accounts = require('./models/admin_accounts.model');
 const customer_accounts = require('./models/customer_accounts.model');
 const bike_infos = require('./models/bike_infos.model');
+const bike_reserve = require('./models/bikeReservation.model');
 
 app.use(cors());
 app.use(express.json());
@@ -382,7 +383,7 @@ app.post('/rbmsa/loginAcc',  async (req, res) => {
             if (!isValidPassword) {
                 return res.send({ message: 'Invalid password' });
             }else{
-                return res.send({ message: 'Login successful', isFound: true, loginData:{username:findUser.c_username,password:i_password} });
+                return res.send({ message: 'Login successful', isFound: true, loginData:findUser});
             }
         }
     } catch (error) {
@@ -390,7 +391,72 @@ app.post('/rbmsa/loginAcc',  async (req, res) => {
     }
 })
 
+// app.put('/rbmsa/UpdateReserve/:id', async (req, res)=>{
+//     try {
+//         const id =  req.params.id;
+//         const bstatus = req.body.bike_status;
+//         const reserveData = req.body;
 
+        
+//         const findBike =  await bike_infos.findOne({ _id: id });
+        
+//         if (!findBike) {
+//             return res.send({ message: 'Bike not found' });
+//         }
+
+//         const updatedBikeStat = await bike_infos.findByIdAndUpdate(id, {bike_status:bstatus}, { new: true });
+
+
+//         const insertReserve = await bike_reserve({
+//             ...reserveData
+//         })
+//         await insertReserve.save();
+
+//         return res.send({ message: 'Bike status reserved successfully', data: updatedBikeStat });
+
+
+//     } catch (error) {
+//         console.error('Error updating bike status:', error);
+//         return res.status(500).json({ message: 'Error updating bike status', error: error.message });
+//     }
+// })
+app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
+    const id = req.params.id;
+    const { bike_status, ...reserveData } = req.body; // Destructure bike_status and reserveData
+
+    try {
+        // Check if the bike exists
+        const findBike = await bike_infos.findById(id);
+        if (!findBike) {
+            return res.send({ message: 'Bike not found' });
+        }
+
+        // Update bike status
+        const updatedBikeStat = await bike_infos.findByIdAndUpdate(
+            id,
+            { bike_status },
+            { new: true, runValidators: true } // Added runValidators to ensure data integrity
+        );
+
+        // Insert reservation data
+        const insertReserve = new bike_reserve({ ...reserveData, bikeId: id }); // Include bikeId in reserve data
+        await insertReserve.save();
+
+        return res.send({
+            message: 'Bike status reserved successfully',
+            isReserved: true,
+            data: updatedBikeStat
+        });
+
+    } catch (error) {
+        console.error('Error updating bike status:', error);
+        return res.send({
+            message: 'Sorry you are not logged in.',
+            error: error.message,
+            isReserved: false
+        });
+    }
+});
 
 
 
