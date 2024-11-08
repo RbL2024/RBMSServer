@@ -377,7 +377,7 @@ app.post('/rbmsa/loginAcc',  async (req, res) => {
         const  { i_username, i_password } = req.body;
         const findUser = await customer_accounts.findOne({ c_username: i_username });
         if (!findUser) {
-            return res.send({ message: 'User not found', isFound: false });
+            return res.send({ message: 'User not found, check for whitespaces.', isFound: false });
         }else{
             const isValidPassword = await bcrypt.compare(i_password, findUser.c_password);
             if (!isValidPassword) {
@@ -391,35 +391,7 @@ app.post('/rbmsa/loginAcc',  async (req, res) => {
     }
 })
 
-// app.put('/rbmsa/UpdateReserve/:id', async (req, res)=>{
-//     try {
-//         const id =  req.params.id;
-//         const bstatus = req.body.bike_status;
-//         const reserveData = req.body;
 
-        
-//         const findBike =  await bike_infos.findOne({ _id: id });
-        
-//         if (!findBike) {
-//             return res.send({ message: 'Bike not found' });
-//         }
-
-//         const updatedBikeStat = await bike_infos.findByIdAndUpdate(id, {bike_status:bstatus}, { new: true });
-
-
-//         const insertReserve = await bike_reserve({
-//             ...reserveData
-//         })
-//         await insertReserve.save();
-
-//         return res.send({ message: 'Bike status reserved successfully', data: updatedBikeStat });
-
-
-//     } catch (error) {
-//         console.error('Error updating bike status:', error);
-//         return res.status(500).json({ message: 'Error updating bike status', error: error.message });
-//     }
-// })
 app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
     const id = req.params.id;
     const { bike_status, ...reserveData } = req.body; // Destructure bike_status and reserveData
