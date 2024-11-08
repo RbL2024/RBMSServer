@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const bike_reserve_schema = new mongoose.Schema({
+    reservation_number: {
+        type: String,
+        default: makeResID(5)
+    },
     name:{
         type:String,
         required:true
@@ -12,6 +16,10 @@ const bike_reserve_schema = new mongoose.Schema({
     phone: {
         type: String,
         required: true
+    },
+    email:{
+        type: String,
+        required:true
     },
     bike_id:  {
         type: String,
@@ -37,3 +45,18 @@ const bike_reserve_schema = new mongoose.Schema({
 
 const  bike_reserve = mongoose.model('bike_reserve', bike_reserve_schema);
 module.exports = bike_reserve;
+
+
+function makeResID(length) {
+    let result = '';
+    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const characters = '0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+        counter += 1;
+    }
+    return 'RESID-' + result;
+}
