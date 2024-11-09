@@ -2,6 +2,7 @@ require('./dbconn');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
+const moment = require('moment-timezone');
 require('dotenv').config();
 
 const app = express()
@@ -327,17 +328,17 @@ app.post('/rbmsa/createUser', async (req, res) => {
     try {
         const data = req.body;
 
-        const existingUser  = await customer_accounts.findOne({
+        const existingUser = await customer_accounts.findOne({
             $or: [
                 { c_username: data.i_username },
                 { c_email: data.i_email }
             ]
         });
 
-        if (existingUser ) {
-            return res.send({ 
-                message: 'Username or email already exists', 
-                isCreated: false 
+        if (existingUser) {
+            return res.send({
+                message: 'Username or email already exists',
+                isCreated: false
             });
         }
         const hashedPass = await bcrypt.hash(data.i_password, 10);
@@ -372,18 +373,18 @@ app.post('/rbmsa/createUser', async (req, res) => {
 })
 
 
-app.post('/rbmsa/loginAcc',  async (req, res) => {
+app.post('/rbmsa/loginAcc', async (req, res) => {
     try {
-        const  { i_username, i_password } = req.body;
+        const { i_username, i_password } = req.body;
         const findUser = await customer_accounts.findOne({ c_username: i_username });
         if (!findUser) {
             return res.send({ message: 'User not found, check for whitespaces.', isFound: false });
-        }else{
+        } else {
             const isValidPassword = await bcrypt.compare(i_password, findUser.c_password);
             if (!isValidPassword) {
                 return res.send({ message: 'Invalid password' });
-            }else{
-                return res.send({ message: 'Login successful', isFound: true, loginData:findUser});
+            } else {
+                return res.send({ message: 'Login successful', isFound: true, loginData: findUser });
             }
         }
     } catch (error) {
@@ -395,12 +396,40 @@ app.post('/rbmsa/loginAcc',  async (req, res) => {
 app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
     const id = req.params.id;
     const { bike_status, ...reserveData } = req.body; // Destructure bike_status and reserveData
-
     try {
         // Check if the bike exists
         const findBike = await bike_infos.findById(id);
         if (!findBike) {
             return res.send({ message: 'Bike not found' });
+        }
+
+        // Check if the bike is already reserved for today
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        console.log(reserveData.email)
+        
+        // Check if the user has already reserved a bike today
+        const existingReservationForEmail = await bike_reserve.findOne({
+            email: reserveData.email,
+            reservation_date: { $gte: startOfDay, $lte: endOfDay } // Ensure no existing reservations for today
+        });
+
+        if (existingReservationForEmail) {
+            return res.send({ message: 'You have already reserved a bike for today. You cannot reserve another one.' });
+        }
+
+        const existingReservation = await bike_reserve.findOne({
+            bike_id: reserveData.bike_id,
+            reservation_date: {
+                $gte: startOfDay,
+                $lt: endOfDay
+            }
+        });
+        console.log(reserveData.bike_id)
+
+        if (existingReservation) {
+            return res.send({ message: 'Bike is already reserved for today.' });
         }
 
         // Update bike status
@@ -412,7 +441,40 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
 
         // Insert reservation data
         const insertReserve = new bike_reserve({ ...reserveData, bikeId: id }); // Include bikeId in reserve data
-        await insertReserve.save();
+        const savedReserve = await insertReserve.save();
+
+        // Check if the reservation was saved successfully
+        if (savedReserve) {
+            const userInfo = {
+                ...reserveData
+            };
+
+            const nodemailer = require('nodemailer');
+
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                port: 587,
+                secure: false,
+                auth: {
+                    user: process.env.NODEMAILER_USER,
+                    pass: process.env.NODEMAILER_PASSWORD
+                }
+            });
+
+            const mailOptions = {
+                from: 'RBMS Labanos Team <rbms.labanos2024@gmail.com>',
+                to: userInfo.email,
+                subject: 'Bike Reservation',
+                html: `
+                    <p>Hello ${userInfo.name}, you reserved for ${userInfo.bike_id} </p>
+                    <p>present this to the labanos team to confirm your reservation and to start your bike rental</p>
+                `
+            };
+
+            await transporter.sendMail(mailOptions);
+        } else {
+            return res.send({ message: 'Error saving reservation, email not sent.', isReserved: false });
+        }
 
         return res.send({
             message: 'Bike status reserved successfully',
@@ -423,7 +485,7 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
     } catch (error) {
         console.error('Error updating bike status:', error);
         return res.send({
-            message: 'Sorry you are not logged in.',
+            message: 'Something went wrong',
             error: error.message,
             isReserved: false
         });
@@ -431,7 +493,72 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
 });
 
 
+app.post('/rbmsa/getReservations', async (req, res) => {
+    try {
+        const data = req.body;
 
+        // Check if the bike is already reserved for today
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        const getReservations = await bike_reserve.findOne({
+            bike_id: data.bID,
+            reservation_date: {
+                $gte: startOfDay,
+                $lt: endOfDay
+            }
+        })
+        res.send(getReservations);
+    } catch (error) {
+        console.error('Error getting reservations:', error);
+    }
+})
+
+
+// app.post('/rbmsa/reservedBike', async (req, res) => {
+//     try {
+//         const data = req.body;
+//         const records = await bike_infos.find({ bike_id: data.bID});
+//         // console.log(data);
+//         res.send({records});
+//     } catch (error) {
+//         res.status(500).json({ message: error.message });
+//     }
+// });
+app.post('/rbmsa/reservedBike', async (req, res) => {
+    try {
+        const data = req.body;
+        const bikeId = data.bID;
+        const userEmail = data.email; // Assuming the email is passed in the request body
+        
+        // Get the start and end of the day
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        // Find reservations for the specified bike_id and email that are made today
+        const reservationsToday = await bike_reserve.find({
+            bike_id: bikeId,
+            email: userEmail, // Filter by user email
+            reservation_date: { $gte: startOfDay, $lte: endOfDay }
+        });
+
+        // Check if reservationsToday is an array and its length
+        if (!Array.isArray(reservationsToday) || reservationsToday.length === 0) {
+            return res.send({ records: [], message: 'No reservations found for today for this email.' });
+        }
+
+        // Get bike information for the specified bike_id
+        const bikeInfo = await bike_infos.find({ bike_id: bikeId });
+
+        // Combine the results
+        res.send({
+            bikeInfo,
+            reservationsToday
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

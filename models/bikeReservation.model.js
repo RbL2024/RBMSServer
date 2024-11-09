@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const moment = require('moment-timezone');
 
 const bike_reserve_schema = new mongoose.Schema({
     reservation_number: {
@@ -38,11 +39,11 @@ const bike_reserve_schema = new mongoose.Schema({
         required: true
     },
     reservation_date:{
-        type:Date,
-        default:Date.now
+        type: Date,
+        default: ()=> moment.tz(new Date(), "Asia/Manila").utc().toDate()
     }
 })
-
+// console.log(moment.tz(new Date(), "Asia/Manila").toDate())
 const  bike_reserve = mongoose.model('bike_reserve', bike_reserve_schema);
 module.exports = bike_reserve;
 
