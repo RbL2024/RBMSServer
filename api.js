@@ -281,6 +281,26 @@ app.put('/updatePassword/:id', async (req, res) => {
     }
 })
 
+app.get('/getReservations', async (req, res) => {
+    try {
+
+        // Check if the bike is already reserved for today
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        const getReservations = await bike_reserve.find({
+            reservation_date: {
+                $gte: startOfDay,
+                $lt: endOfDay,
+            },
+            isCanceled: false
+        })
+        res.send(getReservations);
+    } catch (error) {
+        console.error('Error getting reservations:', error);
+    }
+})
+
 
 //ANDROID QUERIES
 app.get('/rbmsa/check-connection', async (req, res) => {
@@ -553,6 +573,43 @@ app.post('/rbmsa/reservedBike', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+app.post('/rbmsa/getAllUser-Reservations', async (req, res) => {
+    try {
+        const { email } = req.body; // Assuming the email is sent in the request body
+
+        // Fetch all reservations for the logged-in user based on their email
+        const userReservations = await bike_reserve.find({ email: email});
+
+        if (userReservations.length === 0) {
+            return res.send({ message: 'No reservations found for this user.', records: [] });
+        }
+
+        // Extract bike_ids from the reservations
+        const bikeIds = userReservations.map(reservation => reservation.bike_id);
+
+        // Fetch bike information for the corresponding bike_ids
+        const bikeInfo = await bike_infos.find({ bike_id: { $in: bikeIds } });
+
+        // Create a mapping of bike_id to bike details for easy access
+        const bikeDetailsMap = bikeInfo.reduce((map, bike) => {
+            map[bike.bike_id] = bike;
+            return map;
+        }, {});
+
+        // Combine reservations with their corresponding bike information
+        const reservationsWithBikeInfo = userReservations.map(reservation => ({
+            ...reservation.toObject(), // Convert mongoose document to plain object
+            bikeInfo: bikeDetailsMap[reservation.bike_id] || null // Add bike info or null if not found
+        }));
+
+        res.send({ message: 'Reservations retrieved successfully.', records: reservationsWithBikeInfo });
+    } catch (error) {
+        console.error('Error fetching user reservations:', error);
+        res.status(500).send({ message: 'Error fetching reservations', error: error.message });
+    }
+});
+
 
 app.put('/rbmsa/cancelReservation', async (req, res) => {
     try {
