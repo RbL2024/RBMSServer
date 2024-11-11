@@ -331,15 +331,10 @@ app.get('/getReservationsALL', async (req, res) => {
         const endOfDay = moment().endOf('day').utc().toDate();
 
         // Fetch reservations for today that are not canceled
-        const getReservations = await bike_reserve.find({
-            reservation_date: {
-                $gte: startOfDay,
-                $lt: endOfDay,
-            }
-        });
+        const getReservations = await bike_reserve.find();
 
         if (getReservations.length === 0) {
-            return res.send({ message: 'No reservations found for today.', records: [] });
+            return res.send({ message: 'Reservations is empty.', records: [] });
         }
 
         // Extract bike_ids from the reservations
