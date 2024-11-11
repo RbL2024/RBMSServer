@@ -370,7 +370,7 @@ app.get('/getReservationsFIVE', async (req, res) => {
         // Fetch reservations for today that are not canceled
         const getReservations = await bike_reserve.find()
             .sort({ dateAdded: -1 })
-            .limit(10);
+            .limit(5);
 
         if (getReservations.length === 0) {
             return res.send({ message: 'Reservations is empty.', records: [] });
