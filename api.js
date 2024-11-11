@@ -361,6 +361,45 @@ app.get('/getReservationsALL', async (req, res) => {
         res.status(500).send({ message: 'Error getting reservations', error: error.message });
     }
 });
+app.get('/getReservationsFIVE', async (req, res) => {
+    try {
+        // Check if the bike is already reserved for today
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        // Fetch reservations for today that are not canceled
+        const getReservations = await bike_reserve.find()
+            .sort({ dateAdded: -1 })
+            .limit(10);
+
+        if (getReservations.length === 0) {
+            return res.send({ message: 'Reservations is empty.', records: [] });
+        }
+
+        // Extract bike_ids from the reservations
+        const bikeIds = getReservations.map(reservation => reservation.bike_id);
+
+        // Fetch bike information for the corresponding bike_ids
+        const bikeInfo = await bike_infos.find({ bike_id: { $in: bikeIds } });
+
+        // Create a mapping of bike_id to bike details for easy access
+        const bikeDetailsMap = bikeInfo.reduce((map, bike) => {
+            map[bike.bike_id] = bike;
+            return map;
+        }, {});
+
+        // Combine reservations with their corresponding bike information
+        const reservationsWithBikeInfo = getReservations.map(reservation => ({
+            ...reservation.toObject(), // Convert mongoose document to plain object
+            bikeInfo: bikeDetailsMap[reservation.bike_id] || null // Add bike info or null if not found
+        }));
+
+        res.send({ message: 'Reservations retrieved successfully.', records: reservationsWithBikeInfo });
+    } catch (error) {
+        console.error('Error getting reservations:', error);
+        res.status(500).send({ message: 'Error getting reservations', error: error.message });
+    }
+});
 
 
 //ANDROID QUERIES
@@ -489,7 +528,7 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
         const endOfDay = moment().endOf('day').utc().toDate();
 
         console.log(reserveData.email)
-        
+
         // Check if the user has already reserved a bike today
         const existingReservationForEmail = await bike_reserve.findOne({
             email: reserveData.email,
@@ -604,7 +643,7 @@ app.post('/rbmsa/reservedBike', async (req, res) => {
         const data = req.body;
         const bikeId = data.bID;
         const userEmail = data.email; // Assuming the email is passed in the request body
-        
+
         // Get the start and end of the day
         const startOfDay = moment().startOf('day').utc().toDate();
         const endOfDay = moment().endOf('day').utc().toDate();
@@ -640,7 +679,7 @@ app.post('/rbmsa/getAllUser-Reservations', async (req, res) => {
         const { email } = req.body; // Assuming the email is sent in the request body
 
         // Fetch all reservations for the logged-in user based on their email
-        const userReservations = await bike_reserve.find({ email: email});
+        const userReservations = await bike_reserve.find({ email: email });
 
         if (userReservations.length === 0) {
             return res.send({ message: 'No reservations found for this user.', records: [] });
@@ -698,7 +737,7 @@ app.put('/rbmsa/cancelReservation', async (req, res) => {
         // Update the isCancel field to true for all found reservations
         const updatePromises = reservationsToday.map(async (reservation) => {
             // Update reservation to be canceled
-            await bike_reserve.findByIdAndUpdate(reservation._id, { isCanceled: true, timeofuse:'00:00' }, { new: true });
+            await bike_reserve.findByIdAndUpdate(reservation._id, { isCanceled: true, timeofuse: '00:00' }, { new: true });
 
             // Update the bike status to 'vacant'
             await bike_infos.findOneAndUpdate(
