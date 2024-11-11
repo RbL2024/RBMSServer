@@ -412,7 +412,8 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
         // Check if the user has already reserved a bike today
         const existingReservationForEmail = await bike_reserve.findOne({
             email: reserveData.email,
-            reservation_date: { $gte: startOfDay, $lte: endOfDay } // Ensure no existing reservations for today
+            reservation_date: { $gte: startOfDay, $lte: endOfDay },
+            isCanceled: false // Ensure no existing reservations for today
         });
 
         if (existingReservationForEmail) {
@@ -424,9 +425,9 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
             reservation_date: {
                 $gte: startOfDay,
                 $lt: endOfDay
-            }
+            },
+            isCanceled: false
         });
-        console.log(reserveData.bike_id)
 
         if (existingReservation) {
             return res.send({ message: 'Bike is already reserved for today.' });
@@ -503,10 +504,12 @@ app.post('/rbmsa/getReservations', async (req, res) => {
 
         const getReservations = await bike_reserve.findOne({
             bike_id: data.bID,
+            email: data.email,
             reservation_date: {
                 $gte: startOfDay,
-                $lt: endOfDay
-            }
+                $lt: endOfDay,
+            },
+            isCanceled: false
         })
         res.send(getReservations);
     } catch (error) {
@@ -515,16 +518,6 @@ app.post('/rbmsa/getReservations', async (req, res) => {
 })
 
 
-// app.post('/rbmsa/reservedBike', async (req, res) => {
-//     try {
-//         const data = req.body;
-//         const records = await bike_infos.find({ bike_id: data.bID});
-//         // console.log(data);
-//         res.send({records});
-//     } catch (error) {
-//         res.status(500).json({ message: error.message });
-//     }
-// });
 app.post('/rbmsa/reservedBike', async (req, res) => {
     try {
         const data = req.body;
@@ -539,7 +532,8 @@ app.post('/rbmsa/reservedBike', async (req, res) => {
         const reservationsToday = await bike_reserve.find({
             bike_id: bikeId,
             email: userEmail, // Filter by user email
-            reservation_date: { $gte: startOfDay, $lte: endOfDay }
+            reservation_date: { $gte: startOfDay, $lte: endOfDay },
+            isCanceled: false
         });
 
         // Check if reservationsToday is an array and its length
@@ -559,6 +553,62 @@ app.post('/rbmsa/reservedBike', async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 });
+
+app.put('/rbmsa/cancelReservation', async (req, res) => {
+    try {
+        const data = req.body; // Expecting bike_id and email in the request body
+        const bID = data.bID;
+        const email = data.email;
+
+        // Get the start and end of the day
+        const startOfDay = moment().startOf('day').utc().toDate();
+        const endOfDay = moment().endOf('day').utc().toDate();
+
+        // Find reservations for the specified bike_id and email that are made today
+        const reservationsToday = await bike_reserve.find({
+            bike_id: bID,
+            email: email,
+            reservation_date: { $gte: startOfDay, $lt: endOfDay },
+            isCanceled: false
+        });
+
+        // Check if there are any reservations to cancel
+        if (!Array.isArray(reservationsToday) || reservationsToday.length === 0) {
+            return res.send({ records: [], message: 'No reservations found for today for this email.' });
+        }
+
+        // Update the isCancel field to true for all found reservations
+        const updatePromises = reservationsToday.map(async (reservation) => {
+            // Update reservation to be canceled
+            await bike_reserve.findByIdAndUpdate(reservation._id, { isCanceled: true, timeofuse:'00:00' }, { new: true });
+
+            // Update the bike status to 'vacant'
+            await bike_infos.findOneAndUpdate(
+                { bike_id: bID },
+                { bike_status: 'vacant' }, // Set status to 'vacant'
+                { new: true }
+            );
+        });
+
+        await Promise.all(updatePromises);
+
+        res.send({ message: 'Reservations cancelled successfully.', isCanceled: true });
+    } catch (error) {
+        console.error('Error cancelling reservation:', error);
+        res.status(500).send({ message: 'Error cancelling reservation', error: error.message });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

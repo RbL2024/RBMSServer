@@ -34,9 +34,17 @@ const bike_reserve_schema = new mongoose.Schema({
         type: String,
         required: true
     },
-    paymentTotal: {
+    totalReservationFee: {
         type: String,
         required: true
+    },
+    totalBikeRentPrice:{
+        type: String,
+        required: true
+    },
+    isCanceled: {
+        type: Boolean,
+        default: false
     },
     reservation_date:{
         type: Date,
