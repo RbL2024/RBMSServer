@@ -293,7 +293,7 @@ app.get('/getReservations', async (req, res) => {
                 $gte: startOfDay,
                 $lt: endOfDay,
             },
-            isCanceled: false
+            bikeStatus: 'RESERVED'
         });
 
         if (getReservations.length === 0) {
@@ -533,7 +533,7 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
         const existingReservationForEmail = await bike_reserve.findOne({
             email: reserveData.email,
             reservation_date: { $gte: startOfDay, $lte: endOfDay },
-            isCanceled: false // Ensure no existing reservations for today
+            bikeStatus: 'RESERVED' // Ensure no existing reservations for today
         });
 
         if (existingReservationForEmail) {
@@ -546,7 +546,7 @@ app.put('/rbmsa/UpdateReserve/:id', async (req, res) => {
                 $gte: startOfDay,
                 $lt: endOfDay
             },
-            isCanceled: false
+            bikeStatus: 'RESERVED'
         });
 
         if (existingReservation) {
@@ -629,7 +629,7 @@ app.post('/rbmsa/getReservations', async (req, res) => {
                 $gte: startOfDay,
                 $lt: endOfDay,
             },
-            isCanceled: false
+            bikeStatus: 'RESERVED'
         })
         res.send(getReservations);
     } catch (error) {
@@ -653,7 +653,7 @@ app.post('/rbmsa/reservedBike', async (req, res) => {
             bike_id: bikeId,
             email: userEmail, // Filter by user email
             reservation_date: { $gte: startOfDay, $lte: endOfDay },
-            isCanceled: false
+            bikeStatus: 'RESERVED'
         });
 
         // Check if reservationsToday is an array and its length
@@ -726,7 +726,7 @@ app.put('/rbmsa/cancelReservation', async (req, res) => {
             bike_id: bID,
             email: email,
             reservation_date: { $gte: startOfDay, $lt: endOfDay },
-            isCanceled: false
+            bikeStatus: 'RESERVED'
         });
 
         // Check if there are any reservations to cancel
@@ -737,7 +737,7 @@ app.put('/rbmsa/cancelReservation', async (req, res) => {
         // Update the isCancel field to true for all found reservations
         const updatePromises = reservationsToday.map(async (reservation) => {
             // Update reservation to be canceled
-            await bike_reserve.findByIdAndUpdate(reservation._id, { isCanceled: true, timeofuse: '00:00' }, { new: true });
+            await bike_reserve.findByIdAndUpdate(reservation._id, { bikeStatus: 'RESERVED', timeofuse: '00:00' }, { new: true });
 
             // Update the bike status to 'vacant'
             await bike_infos.findOneAndUpdate(
@@ -749,7 +749,7 @@ app.put('/rbmsa/cancelReservation', async (req, res) => {
 
         await Promise.all(updatePromises);
 
-        res.send({ message: 'Reservations cancelled successfully.', isCanceled: true });
+        res.send({ message: 'Reservations cancelled successfully.', bikeStatus: 'RESERVED' });
     } catch (error) {
         console.error('Error cancelling reservation:', error);
         res.status(500).send({ message: 'Error cancelling reservation', error: error.message });

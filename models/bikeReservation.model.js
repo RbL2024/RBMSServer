@@ -42,9 +42,9 @@ const bike_reserve_schema = new mongoose.Schema({
         type: String,
         required: true
     },
-    isCanceled: {
-        type: Boolean,
-        default: false
+    bikeStatus:{
+        type: String,
+        default: 'RESERVED'
     },
     reservation_date:{
         type: Date,
