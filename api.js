@@ -295,7 +295,9 @@ app.get('/getReservations', async (req, res) => {
             },
             $or: [
                 { bikeStatus: 'RESERVED' },
-                { bikeStatus: 'CANCELED' }
+                { bikeStatus: 'CANCELED' },
+                { bikeStatus: 'RENTED' },
+
             ]
         });
 
