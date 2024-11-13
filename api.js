@@ -372,7 +372,7 @@ app.get('/getReservations', async (req, res) => {
                 { bikeStatus: 'RESERVED' },
                 { bikeStatus: 'CANCELED' },
                 { bikeStatus: 'RENTED' },
-                { bikeStatus: 'DONE' },
+                { bikeStatus: 'COMPLETE' },
 
             ]
         });
