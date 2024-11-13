@@ -372,6 +372,7 @@ app.get('/getReservations', async (req, res) => {
                 { bikeStatus: 'RESERVED' },
                 { bikeStatus: 'CANCELED' },
                 { bikeStatus: 'RENTED' },
+                { bikeStatus: 'DONE' },
 
             ]
         });
@@ -480,6 +481,82 @@ app.get('/getReservationsFIVE', async (req, res) => {
         res.status(500).send({ message: 'Error getting reservations', error: error.message });
     }
 });
+app.put('/updateBikeStatus/:reserveId', async (req, res) => {
+    try {
+        const reserveId = req.params.reserveId; // Get the reservation ID from the request parameters
+        const { bikeStatus, bikeId } = req.body; // Expecting bikeStatus and bikeId in the request body
+
+        // Update the bikeStatus in bike_reserve
+        const updatedReserve = await bike_reserve.findByIdAndUpdate(
+            reserveId,
+            { bikeStatus: bikeStatus }, // Set the new bikeStatus
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedReserve) {
+            return res.status(404).send({ message: 'Reservation not found' });
+        }
+
+        // Update the bike_status in bike_infos based on bike_id
+        const updatedBike = await bike_infos.findOneAndUpdate(
+            { bike_id: bikeId },
+            { bike_status: bikeStatus }, // Set the new bike_status
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedBike) {
+            return res.status(404).send({ message: 'Bike not found' });
+        }
+
+        res.send({
+            message: 'Bike status updated successfully',
+            updatedReserve,
+            updatedBike
+        });
+    } catch (error) {
+        console.error('Error updating bike status:', error);
+        res.status(500).send({ message: 'Error updating bike status', error: error.message });
+    }
+});
+app.put('/updateBikeStatusToVacant/:reserveId', async (req, res) => {
+    try {
+        const reserveId = req.params.reserveId; // Get the reservation ID from the request parameters
+        const { bikeStatus, bikeId } = req.body; // Expecting bikeStatus and bikeId in the request body
+
+        // Update the bikeStatus in bike_reserve
+        const updatedReserve = await bike_reserve.findByIdAndUpdate(
+            reserveId,
+            { bikeStatus: "DONE" }, // Set the new bikeStatus
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedReserve) {
+            return res.status(404).send({ message: 'Reservation not found' });
+        }
+
+        // Update the bike_status in bike_infos based on bike_id
+        const updatedBike = await bike_infos.findOneAndUpdate(
+            { bike_id: bikeId },
+            { bike_status: bikeStatus }, // Set the new bike_status
+            { new: true } // Return the updated document
+        );
+
+        if (!updatedBike) {
+            return res.status(404).send({ message: 'Bike not found' });
+        }
+
+        res.send({
+            message: 'Bike status updated successfully',
+            updatedReserve,
+            updatedBike
+        });
+    } catch (error) {
+        console.error('Error updating bike status:', error);
+        res.status(500).send({ message: 'Error updating bike status', error: error.message });
+    }
+});
+
+
 
 
 //ANDROID QUERIES
