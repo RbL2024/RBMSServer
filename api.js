@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const moment = require('moment-timezone');
 require('dotenv').config();
 
+
 const app = express()
 const PORT = process.env.LISTEN_PORT;
 
@@ -44,6 +45,7 @@ app.get('/api/bikes', async (req, res) => {
 
 app.post('/send-question', (req, res) => {
     const { question, email } = req.body;
+    const nodemailer = require('nodemailer');
 
     if (!question || !email) {
         return res.status(400).json({ message: 'Both question and email are required.' });
