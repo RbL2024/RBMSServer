@@ -22,25 +22,75 @@ app.use(express.urlencoded({ limit: '10mb', extended: true }));
 //WEBSITE
 app.get('/api/bikes', async (req, res) => {
     try {
-      const adultBikes = await bike_infos
-        .find({ bike_type: 'Adult_bicycle' })
-        .limit(5)
-        .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
-  
-      const kidBikes = await bike_infos
-        .find({ bike_type: 'Kid_bicycle' })
-        .limit(5)
-        .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
-  
-      res.json({
-        adultBikes,
-        kidBikes
-      });
+        const adultBikes = await bike_infos
+            .find({ bike_type: 'Adult_bicycle' })
+            .limit(5)
+            .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
+
+        const kidBikes = await bike_infos
+            .find({ bike_type: 'Kid_bicycle' })
+            .limit(5)
+            .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
+
+        res.json({
+            adultBikes,
+            kidBikes
+        });
     } catch (error) {
-      console.error('Error fetching bikes:', error.message);
-      res.status(500).json({ message: error.message });
+        console.error('Error fetching bikes:', error.message);
+        res.status(500).json({ message: error.message });
     }
-  });
+});
+
+app.post('/send-question', (req, res) => {
+    const { question, email } = req.body;
+
+    if (!question || !email) {
+        return res.status(400).json({ message: 'Both question and email are required.' });
+    }
+
+    // Nodemailer configuration
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'rbms.labanos2024@gmail.com', // Your email
+            pass: 'gmuwmhckmxdnyaho', // Your email password or an app password
+        },
+    });
+
+    const mailOptions = {
+        from: `"RBMS Support" <no-reply@yourdomain.com>`, // Ensure a valid email format
+        to: "rbms.labanos2024@gmail.com", // Recipient email address
+        subject: `New Question from ${email}`, // Clear and concise subject
+        replyTo: email, // Enables direct replies to the user's email
+        text: `
+    Dear Team,
+    
+    We have received a new question from a user. Please find the details below:
+    
+    User Details:
+    - Email: ${email}
+    - Question: ${question}
+    
+    Please respond at your earliest convenience.
+    
+    Thank you for your attention to this matter.
+    
+    Best regards,
+    The RBMS Support Team
+    `,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+            console.error('Error sending email:', error);
+            return res.status(500).json({ message: 'Failed to send email', error: error.toString() });
+        }
+        console.log('Email sent:', info.response);
+        res.status(200).json({ message: 'Email sent successfully', info: info.response });
+    });
+});
+
 
 
 //DESKTOP QUERIES
