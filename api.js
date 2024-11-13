@@ -18,6 +18,31 @@ app.use(express.json());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+
+//WEBSITE
+app.get('/api/bikes', async (req, res) => {
+    try {
+      const adultBikes = await bike_infos
+        .find({ bike_type: 'Adult_bicycle' })
+        .limit(5)
+        .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
+  
+      const kidBikes = await bike_infos
+        .find({ bike_type: 'Kid_bicycle' })
+        .limit(5)
+        .sort({ someField: 1 }); // Replace 'someField' with the field you want to sort by, use 1 for ascending, -1 for descending
+  
+      res.json({
+        adultBikes,
+        kidBikes
+      });
+    } catch (error) {
+      console.error('Error fetching bikes:', error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+
 //DESKTOP QUERIES
 app.get('/fetchAdminAccounts', async (req, res) => {
     try {
