@@ -53,8 +53,8 @@ app.post('/send-question', (req, res) => {
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-            user: 'rbms.labanos2024@gmail.com', // Your email
-            pass: 'gmuwmhckmxdnyaho', // Your email password or an app password
+            user: process.env.NODEMAILER_USER, // Your email
+            pass: process.env.NODEMAILER_PASSWORD, // Your email password or an app password
         },
     });
 
