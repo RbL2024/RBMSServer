@@ -46,6 +46,14 @@ const bike_reserve_schema = new mongoose.Schema({
         type: String,
         default: 'RESERVED'
     },
+    lockState:{
+        type: Boolean,
+        default: false
+    },
+    alarmState: {
+        type: Boolean,
+        default: false
+    },
     reservation_date:{
         type: Date,
         default: ()=> moment.tz(new Date(), "Asia/Manila").utc().toDate()
