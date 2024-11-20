@@ -34,6 +34,10 @@ const bike_reserve_schema = new mongoose.Schema({
         type: String,
         required: true
     },
+    returnTime:{
+        type: String,
+        default: '00:00'
+    },
     totalReservationFee: {
         type: String,
         required: true
@@ -48,7 +52,7 @@ const bike_reserve_schema = new mongoose.Schema({
     },
     lockState:{
         type: Boolean,
-        default: false
+        default: true
     },
     alarmState: {
         type: Boolean,

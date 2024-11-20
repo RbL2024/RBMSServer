@@ -25,7 +25,7 @@ const bike_infos_schema = new mongoose.Schema({
     },
     bike_status: {
         type: String,
-        default: 'vacant'
+        default: 'VACANT'
     },
     locked:{
         type: Boolean,

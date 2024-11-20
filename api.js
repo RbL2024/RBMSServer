@@ -2,6 +2,7 @@ require("./dbconn");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
+const bodyParser = require('body-parser');
 const moment = require("moment-timezone");
 
 require("dotenv").config();
@@ -18,6 +19,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(bodyParser.json());
 
 //WEBSITE
 app.get("/api/bikes", async (req, res) => {
@@ -99,6 +101,51 @@ app.post("/send-question", (req, res) => {
 });
 
 //DESKTOP QUERIES
+app.get('/getAnalyticsData', async (req, res) => {
+  try {
+    const bikesWithReservations = await bike_infos.aggregate([
+      {
+        $lookup: {
+          from: "bike_reserves", // The name of the bike_reserve collection
+          localField: "bike_id", // Field from bike_infos collection
+          foreignField: "bike_id", // Field from bike_reserve collection
+          as: "reservations" // The name of the new array field to add
+        }
+      },
+      {
+        $project: {
+          bike_type: 1,
+          reservations: {
+            $filter: {
+              input: "$reservations", // The array to filter
+              as: "reservation", // Variable name for each element
+              cond: {
+                $or: [
+                  { $eq: ["$$reservation.bikeStatus", "COMPLETE"] },
+                  { $ne: ["$$reservation.bikeStatus", "RESERVED"] }
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $unwind: {
+          path: "$reservations", // Unwind to flatten the reservations array
+          preserveNullAndEmptyArrays: false // Keep bikes without reservations
+        }
+      },
+      
+      
+    ]);
+
+    res.status(200).send(bikesWithReservations);
+  } catch (error) {
+    console.error("Error fetching bikes with reservations:", error);
+    res.status(500).send({ message: "Error fetching bikes with reservations", error: error.message });
+  }
+})
+
 app.get("/fetchAdminAccounts", async (req, res) => {
   try {
     const fetchedAcc = await admin_accounts.find({
@@ -253,7 +300,7 @@ app.put("/updateAccount/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const updatedData = req.body; // Get the updated data from the request body
-    console.log(updatedData);
+    
     // Find the account by ID and update it
     const updatedAccount = await admin_accounts.findByIdAndUpdate(
       id,
@@ -303,12 +350,60 @@ app.post("/uploadBikeInfo", async (req, res) => {
   }
 });
 
+// app.get("/fetchAllBikes", async (req, res) => {
+//   try {
+//     const bikeInfo = await bike_infos.find();
+//     res.status(200).send(bikeInfo);
+//   } catch (error) {
+//     console.error("Error fetching all bikes:", error);
+//   }
+// });
 app.get("/fetchAllBikes", async (req, res) => {
   try {
-    const bikeInfo = await bike_infos.find();
+    const bikeInfo = await bike_infos.aggregate([
+      {
+        $lookup: {
+          from: "bike_reserves", // Name of the bike_reserve collection
+          localField: "bike_id",     // Field from bike_infos collection
+          foreignField: "bike_id", // Field from bike_reserve collection
+          as: "reservations"      // Name of the new array field to add
+        }
+      },
+      {
+        $addFields: {
+          reservations: {
+            $filter: {
+              input: "$reservations", // The array to filter
+              as: "reservation", // Variable name for each element
+              cond: {
+                $or: [
+                  { $eq: ["$$reservation.bikeStatus", "RENTED"] }, // Condition for RENTED
+                  { $eq: ["$$reservation.bikeStatus", "RESERVED"] } // Condition for RESERVED
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        $lookup: {
+          from: "customer_accounts", // Name of the customer_accounts collection
+          localField: "reservations.email", // Field from reservations
+          foreignField: "c_email", // Field from customer_accounts collection
+          as: "customerInfo" // Name of the new array field to add
+        }
+      },
+      {
+        $addFields: {
+          customerInfo: { $arrayElemAt: ["$customerInfo", 0] } // Get the first element if multiple matches
+        }
+      },
+    ]);
+    
     res.status(200).send(bikeInfo);
   } catch (error) {
     console.error("Error fetching all bikes:", error);
+    res.status(500).send({ message: "Error fetching all bikes", error: error.message });
   }
 });
 
@@ -527,13 +622,13 @@ app.get("/getReservationsFIVE", async (req, res) => {
 app.put("/updateBikeStatus/:reserveId", async (req, res) => {
   try {
     const reserveId = req.params.reserveId; // Get the reservation ID from the request parameters
-    const { bikeStatus, bikeId } = req.body; // Expecting bikeStatus and bikeId in the request body
+    const { bikeStatus, bikeId, returnTime } = req.body; // Expecting bikeStatus and bikeId in the request body
     const currentTime = moment().format("LT").toString(); // Output: 12:00 AM
     // Update the bikeStatus in bike_reserve
     // console.log(currentTime);
     const updatedReserve = await bike_reserve.findByIdAndUpdate(
       reserveId,
-      { bikeStatus: bikeStatus, timeofuse: currentTime },
+      { bikeStatus: bikeStatus, timeofuse: currentTime, returnTime: returnTime },
       { new: true } // Return the updated document
     );
 
@@ -603,6 +698,23 @@ app.put("/updateBikeStatusToVacant/:reserveId", async (req, res) => {
       .send({ message: "Error updating bike status", error: error.message });
   }
 });
+app.delete("/deleteBike/:bikeId", async (req, res) => {
+    try {
+      const bikeId = req.params.bikeId; // Get the bike_id from the request parameters
+  
+      // Attempt to find and delete the bike info by bike_id
+      const deletedBike = await bike_infos.findOneAndDelete({ bike_id: bikeId });
+  
+      if (!deletedBike) {
+        return res.status(404).send({ message: "Bike not found", success: false });
+      }
+  
+      res.send({ message: "Bike deleted successfully", deletedBike, success: true });
+    } catch (error) {
+      console.error("Error deleting bike:", error);
+      res.status(500).send({ message: "Error deleting bike", error: error.message });
+    }
+  });
 
 //ANDROID QUERIES
 app.get("/rbmsa/check-connection", async (req, res) => {
@@ -740,19 +852,22 @@ app.put("/rbmsa/UpdateReserve/:id", async (req, res) => {
     const startOfDay = moment().startOf("day").utc().toDate();
     const endOfDay = moment().endOf("day").utc().toDate();
 
-    console.log(reserveData.email);
+    // console.log(reserveData.email);
 
     // Check if the user has already reserved a bike today
     const existingReservationForEmail = await bike_reserve.findOne({
       email: reserveData.email,
       reservation_date: { $gte: startOfDay, $lte: endOfDay },
-      bikeStatus: "RESERVED", // Ensure no existing reservations for today
+      $or:[
+       { bikeStatus: "RESERVED"},
+       { bikeStatus: "RENTED"}
+      ], // Ensure no existing reservations for today
     });
 
     if (existingReservationForEmail) {
       return res.send({
         message:
-          "You have already reserved a bike for today. You cannot reserve another one.",
+          "You have already reserved a bike for today. You cannot reserve another one. or Bike is rented",
       });
     }
 
@@ -834,19 +949,43 @@ app.put("/rbmsa/UpdateReserve/:id", async (req, res) => {
 app.post("/rbmsa/getReservations", async (req, res) => {
   try {
     const data = req.body;
-
+    const getbid = data.bID;
+    const getemail = data.email; 
     // Check if the bike is already reserved for today
     const startOfDay = moment().startOf("day").utc().toDate();
     const endOfDay = moment().endOf("day").utc().toDate();
 
     const getReservations = await bike_reserve.findOne({
-      bike_id: data.bID,
-      email: data.email,
+      bike_id: getbid,
+      email: getemail,
       reservation_date: {
         $gte: startOfDay,
         $lt: endOfDay,
       },
       bikeStatus: "RESERVED",
+    });
+    res.send(getReservations);
+  } catch (error) {
+    console.error("Error getting reservations:", error);
+  }
+});
+app.get("/rbmsa/getReservationsviaEmail/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    // Check if the bike is already reserved for today
+    const startOfDay = moment().startOf("day").utc().toDate();
+    const endOfDay = moment().endOf("day").utc().toDate();
+
+    const getReservations = await bike_reserve.findOne({
+      email: email,
+      reservation_date: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+      $or: [
+        {bikeStatus: "RESERVED"},
+        {bikeStatus: "RENTED"}
+      ]
     });
     res.send(getReservations);
   } catch (error) {
@@ -870,6 +1009,85 @@ app.post("/rbmsa/reservedBike", async (req, res) => {
       email: userEmail, // Filter by user email
       reservation_date: { $gte: startOfDay, $lte: endOfDay },
       bikeStatus: "RESERVED",
+    });
+
+    // Check if reservationsToday is an array and its length
+    if (!Array.isArray(reservationsToday) || reservationsToday.length === 0) {
+      return res.send({
+        records: [],
+        message: "No reservations found for today for this email.",
+      });
+    }
+
+    // Get bike information for the specified bike_id
+    const bikeInfo = await bike_infos.find({ bike_id: bikeId });
+
+    // Combine the results
+    res.send({
+      bikeInfo,
+      reservationsToday,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+app.post("/rbmsa/checkBStat", async (req, res) => {
+  try {
+    const data = req.body;
+    const bikeId = data.bID;
+    const userEmail = data.email; // Assuming the email is passed in the request body
+
+    // Get the start and end of the day
+    const startOfDay = moment().startOf("day").utc().toDate();
+    const endOfDay = moment().endOf("day").utc().toDate();
+
+    // Find reservations for the specified bike_id and email that are made today
+    const reservationsToday = await bike_reserve.find({
+      bike_id: bikeId,
+      email: userEmail, // Filter by user email
+      reservation_date: { $gte: startOfDay, $lte: endOfDay },
+      $or:[
+        {bikeStatus: "RESERVED"},
+        {bikeStatus: "RENTED"},
+      ]
+    });
+
+    // Check if reservationsToday is an array and its length
+    if (!Array.isArray(reservationsToday) || reservationsToday.length === 0) {
+      return res.send({
+        records: [],
+        message: "No reservations found for today for this email.",
+      });
+    }
+
+    // Get bike information for the specified bike_id
+    const bikeInfo = await bike_infos.find({ bike_id: bikeId });
+
+    // Combine the results
+    res.send({
+      bikeInfo,
+      reservationsToday,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+app.post("/rbmsa/getRentedBike", async (req, res) => {
+  try {
+    const data = req.body;
+    const bikeId = data.bID;
+    const userEmail = data.email; // Assuming the email is passed in the request body
+
+    // Get the start and end of the day
+    const startOfDay = moment().startOf("day").utc().toDate();
+    const endOfDay = moment().endOf("day").utc().toDate();
+
+    // Find reservations for the specified bike_id and email that are made today
+    const reservationsToday = await bike_reserve.find({
+      bike_id: bikeId,
+      email: userEmail, // Filter by user email
+      reservation_date: { $gte: startOfDay, $lte: endOfDay },
+      bikeStatus: "RENTED"
     });
 
     // Check if reservationsToday is an array and its length
@@ -993,6 +1211,102 @@ app.put("/rbmsa/cancelReservation", async (req, res) => {
       .send({ message: "Error cancelling reservation", error: error.message });
   }
 });
+
+
+
+//ESP32
+app.get("/esp32/getRentedBikeReserve/:email/:bike_id", async (req, res) => {
+  try {
+    const { bike_id, email } = req.params; // Expecting bike_id and email as query parameters
+
+    // Fetch bike reserves where bike_id, email match and bikeStatus is RENTED
+    const rentedReserves = await bike_reserve.find({
+      bike_id: bike_id,
+      email: email,
+      bikeStatus: "RENTED", // Condition for bikeStatus
+    });
+
+    if (rentedReserves.length === 0) {
+      return res.status(404).send({ message: "No rented bike reserves found" });
+    }
+
+    res.send({
+      message: "Rented bike reserves retrieved successfully",
+      records: rentedReserves,
+    });
+  } catch (error) {
+    console.error("Error fetching rented bike reserves:", error);
+    res.status(500).send({ message: "Error fetching rented bike reserves", error: error.message });
+  }
+});
+
+app.put("/esp32/updateLockState", async (req, res) => {
+  try {
+    const { bike_id, email, lockState } = req.body; // Expecting bike_id, email, and lockstate in the request body
+
+    // Update the lockstate in bike_reserve where bike_id and email match
+    const updatedReserve = await bike_reserve.findOneAndUpdate(
+      { bike_id: bike_id, email: email }, // Query to find the reservation
+      { lockState: lockState }, // Set the new lockstate
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedReserve) {
+      return res.status(404).send({ message: "Reservation not found" });
+    }
+
+    res.send({
+      message: "Lockstate updated successfully",
+      updatedReserve,
+    });
+  } catch (error) {
+    console.error("Error updating lockstate:", error);
+    res.status(500).send({ message: "Error updating lockstate", error: error.message });
+  }
+});
+app.put("/esp32/updateAlarmState", async (req, res) => {
+  try {
+    const { bike_id, email, alarmState } = req.body; // Expecting bike_id, email, and lockstate in the request body
+
+    // Update the lockstate in bike_reserve where bike_id and email match
+    const updatedReserve = await bike_reserve.findOneAndUpdate(
+      { bike_id: bike_id, email: email }, // Query to find the reservation
+      { alarmState: alarmState }, // Set the new lockstate
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedReserve) {
+      return res.status(404).send({ message: "Reservation not found" });
+    }
+
+    res.send({
+      message: "alarm state updated successfully",
+      updatedReserve,
+    });
+  } catch (error) {
+    console.error("Error updating lockstate:", error);
+    res.status(500).send({ message: "Error updating lockstate", error: error.message });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
