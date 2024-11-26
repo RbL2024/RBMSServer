@@ -2,8 +2,9 @@ require("./dbconn");
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
-const bodyParser = require('body-parser');
+const bodyParser = require("body-parser");
 const moment = require("moment-timezone");
+const axios = require("axios");
 
 require("dotenv").config();
 
@@ -101,7 +102,7 @@ app.post("/send-question", (req, res) => {
 });
 
 //DESKTOP QUERIES
-app.get('/getAnalyticsData', async (req, res) => {
+app.get("/getAnalyticsData", async (req, res) => {
   try {
     const bikesWithReservations = await bike_infos.aggregate([
       {
@@ -109,8 +110,8 @@ app.get('/getAnalyticsData', async (req, res) => {
           from: "bike_reserves", // The name of the bike_reserve collection
           localField: "bike_id", // Field from bike_infos collection
           foreignField: "bike_id", // Field from bike_reserve collection
-          as: "reservations" // The name of the new array field to add
-        }
+          as: "reservations", // The name of the new array field to add
+        },
       },
       {
         $project: {
@@ -122,29 +123,32 @@ app.get('/getAnalyticsData', async (req, res) => {
               cond: {
                 $or: [
                   { $eq: ["$$reservation.bikeStatus", "COMPLETE"] },
-                  { $ne: ["$$reservation.bikeStatus", "RESERVED"] }
-                ]
-              }
-            }
-          }
-        }
+                  { $ne: ["$$reservation.bikeStatus", "RESERVED"] },
+                ],
+              },
+            },
+          },
+        },
       },
       {
         $unwind: {
           path: "$reservations", // Unwind to flatten the reservations array
-          preserveNullAndEmptyArrays: false // Keep bikes without reservations
-        }
+          preserveNullAndEmptyArrays: false, // Keep bikes without reservations
+        },
       },
-      
-      
     ]);
 
     res.status(200).send(bikesWithReservations);
   } catch (error) {
     console.error("Error fetching bikes with reservations:", error);
-    res.status(500).send({ message: "Error fetching bikes with reservations", error: error.message });
+    res
+      .status(500)
+      .send({
+        message: "Error fetching bikes with reservations",
+        error: error.message,
+      });
   }
-})
+});
 
 app.get("/fetchAdminAccounts", async (req, res) => {
   try {
@@ -300,7 +304,7 @@ app.put("/updateAccount/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const updatedData = req.body; // Get the updated data from the request body
-    
+
     // Find the account by ID and update it
     const updatedAccount = await admin_accounts.findByIdAndUpdate(
       id,
@@ -364,10 +368,10 @@ app.get("/fetchAllBikes", async (req, res) => {
       {
         $lookup: {
           from: "bike_reserves", // Name of the bike_reserve collection
-          localField: "bike_id",     // Field from bike_infos collection
+          localField: "bike_id", // Field from bike_infos collection
           foreignField: "bike_id", // Field from bike_reserve collection
-          as: "reservations"      // Name of the new array field to add
-        }
+          as: "reservations", // Name of the new array field to add
+        },
       },
       {
         $addFields: {
@@ -378,32 +382,34 @@ app.get("/fetchAllBikes", async (req, res) => {
               cond: {
                 $or: [
                   { $eq: ["$$reservation.bikeStatus", "RENTED"] }, // Condition for RENTED
-                  { $eq: ["$$reservation.bikeStatus", "RESERVED"] } // Condition for RESERVED
-                ]
-              }
-            }
-          }
-        }
+                  { $eq: ["$$reservation.bikeStatus", "RESERVED"] }, // Condition for RESERVED
+                ],
+              },
+            },
+          },
+        },
       },
       {
         $lookup: {
           from: "customer_accounts", // Name of the customer_accounts collection
           localField: "reservations.email", // Field from reservations
           foreignField: "c_email", // Field from customer_accounts collection
-          as: "customerInfo" // Name of the new array field to add
-        }
+          as: "customerInfo", // Name of the new array field to add
+        },
       },
       {
         $addFields: {
-          customerInfo: { $arrayElemAt: ["$customerInfo", 0] } // Get the first element if multiple matches
-        }
+          customerInfo: { $arrayElemAt: ["$customerInfo", 0] }, // Get the first element if multiple matches
+        },
       },
     ]);
-    
+
     res.status(200).send(bikeInfo);
   } catch (error) {
     console.error("Error fetching all bikes:", error);
-    res.status(500).send({ message: "Error fetching all bikes", error: error.message });
+    res
+      .status(500)
+      .send({ message: "Error fetching all bikes", error: error.message });
   }
 });
 
@@ -459,13 +465,11 @@ app.put("/updatePassword/:id", async (req, res) => {
     });
 
     if (updatePass) {
-      res
-        .status(200)
-        .json({
-          message: "Password updated successfully",
-          data: updatePass,
-          pUpdated: true,
-        });
+      res.status(200).json({
+        message: "Password updated successfully",
+        data: updatePass,
+        pUpdated: true,
+      });
     } else {
       res.status(404).json({ message: "User not found" });
     }
@@ -628,7 +632,11 @@ app.put("/updateBikeStatus/:reserveId", async (req, res) => {
     // console.log(currentTime);
     const updatedReserve = await bike_reserve.findByIdAndUpdate(
       reserveId,
-      { bikeStatus: bikeStatus, timeofuse: currentTime, returnTime: returnTime },
+      {
+        bikeStatus: bikeStatus,
+        timeofuse: currentTime,
+        returnTime: returnTime,
+      },
       { new: true } // Return the updated document
     );
 
@@ -639,7 +647,7 @@ app.put("/updateBikeStatus/:reserveId", async (req, res) => {
     // Update the bike_status in bike_infos based on bike_id
     const updatedBike = await bike_infos.findOneAndUpdate(
       { bike_id: bikeId },
-      { bike_status: bikeStatus}, // Set the new bike_status
+      { bike_status: bikeStatus }, // Set the new bike_status
       { new: true } // Return the updated document
     );
 
@@ -699,22 +707,30 @@ app.put("/updateBikeStatusToVacant/:reserveId", async (req, res) => {
   }
 });
 app.delete("/deleteBike/:bikeId", async (req, res) => {
-    try {
-      const bikeId = req.params.bikeId; // Get the bike_id from the request parameters
-  
-      // Attempt to find and delete the bike info by bike_id
-      const deletedBike = await bike_infos.findOneAndDelete({ bike_id: bikeId });
-  
-      if (!deletedBike) {
-        return res.status(404).send({ message: "Bike not found", success: false });
-      }
-  
-      res.send({ message: "Bike deleted successfully", deletedBike, success: true });
-    } catch (error) {
-      console.error("Error deleting bike:", error);
-      res.status(500).send({ message: "Error deleting bike", error: error.message });
+  try {
+    const bikeId = req.params.bikeId; // Get the bike_id from the request parameters
+
+    // Attempt to find and delete the bike info by bike_id
+    const deletedBike = await bike_infos.findOneAndDelete({ bike_id: bikeId });
+
+    if (!deletedBike) {
+      return res
+        .status(404)
+        .send({ message: "Bike not found", success: false });
     }
-  });
+
+    res.send({
+      message: "Bike deleted successfully",
+      deletedBike,
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error deleting bike:", error);
+    res
+      .status(500)
+      .send({ message: "Error deleting bike", error: error.message });
+  }
+});
 
 //ANDROID QUERIES
 app.get("/rbmsa/check-connection", async (req, res) => {
@@ -750,12 +766,10 @@ app.put("/rbmsa/updateBikeStat/:bikeid", async (req, res) => {
     const bikeId = req.params.bikeid;
     const bikeStat = req.body;
     const updateBikeStat = await bike_infos.findByIdAndUpdate(bikeId, bikeStat);
-    res
-      .status(200)
-      .json({
-        message: "Bike status updated successfully",
-        data: updateBikeStat,
-      });
+    res.status(200).json({
+      message: "Bike status updated successfully",
+      data: updateBikeStat,
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -858,10 +872,7 @@ app.put("/rbmsa/UpdateReserve/:id", async (req, res) => {
     const existingReservationForEmail = await bike_reserve.findOne({
       email: reserveData.email,
       reservation_date: { $gte: startOfDay, $lte: endOfDay },
-      $or:[
-       { bikeStatus: "RESERVED"},
-       { bikeStatus: "RENTED"}
-      ], // Ensure no existing reservations for today
+      $or: [{ bikeStatus: "RESERVED" }, { bikeStatus: "RENTED" }], // Ensure no existing reservations for today
     });
 
     if (existingReservationForEmail) {
@@ -950,7 +961,7 @@ app.post("/rbmsa/getReservations", async (req, res) => {
   try {
     const data = req.body;
     const getbid = data.bID;
-    const getemail = data.email; 
+    const getemail = data.email;
     // Check if the bike is already reserved for today
     const startOfDay = moment().startOf("day").utc().toDate();
     const endOfDay = moment().endOf("day").utc().toDate();
@@ -982,10 +993,7 @@ app.get("/rbmsa/getReservationsviaEmail/:email", async (req, res) => {
         $gte: startOfDay,
         $lt: endOfDay,
       },
-      $or: [
-        {bikeStatus: "RESERVED"},
-        {bikeStatus: "RENTED"}
-      ]
+      $or: [{ bikeStatus: "RESERVED" }, { bikeStatus: "RENTED" }],
     });
     res.send(getReservations);
   } catch (error) {
@@ -1046,10 +1054,7 @@ app.post("/rbmsa/checkBStat", async (req, res) => {
       bike_id: bikeId,
       email: userEmail, // Filter by user email
       reservation_date: { $gte: startOfDay, $lte: endOfDay },
-      $or:[
-        {bikeStatus: "RESERVED"},
-        {bikeStatus: "RENTED"},
-      ]
+      $or: [{ bikeStatus: "RESERVED" }, { bikeStatus: "RENTED" }],
     });
 
     // Check if reservationsToday is an array and its length
@@ -1087,7 +1092,7 @@ app.post("/rbmsa/getRentedBike", async (req, res) => {
       bike_id: bikeId,
       email: userEmail, // Filter by user email
       reservation_date: { $gte: startOfDay, $lte: endOfDay },
-      bikeStatus: "RENTED"
+      bikeStatus: "RENTED",
     });
 
     // Check if reservationsToday is an array and its length
@@ -1212,7 +1217,42 @@ app.put("/rbmsa/cancelReservation", async (req, res) => {
   }
 });
 
+app.post("/rbmsa/create-transaction", async (req, res) => {
+  const { amount, mobile_phone } = req.body;
 
+  try {
+    // Create a payment link with PayMongo
+    const paymentResponse = await axios.get(
+      "https://pm.link/rbms-com/test/qMPeW1t",
+      {
+        data: {
+          attributes: {
+            amount: amount,
+            currency: "PHP",
+            description: "Bike Reservation",
+            payment_method_types: ["gcash"],
+            metadata: {
+              mobile_phone: mobile_phone,
+            },
+          },
+        },
+      },
+      {
+        headers: {
+          Authorization: `Basic ${Buffer.from(
+            `${process.env.PAYMONGO_SECRET_KEY}:`
+          ).toString("base64")}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    res.status(200).json(paymentResponse.data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Payment creation failed" });
+  }
+});
 
 //ESP32
 app.get("/esp32/getRentedBikeReserve/:email/:bike_id", async (req, res) => {
@@ -1236,7 +1276,12 @@ app.get("/esp32/getRentedBikeReserve/:email/:bike_id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching rented bike reserves:", error);
-    res.status(500).send({ message: "Error fetching rented bike reserves", error: error.message });
+    res
+      .status(500)
+      .send({
+        message: "Error fetching rented bike reserves",
+        error: error.message,
+      });
   }
 });
 
@@ -1261,7 +1306,9 @@ app.put("/esp32/updateLockState", async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating lockstate:", error);
-    res.status(500).send({ message: "Error updating lockstate", error: error.message });
+    res
+      .status(500)
+      .send({ message: "Error updating lockstate", error: error.message });
   }
 });
 app.put("/esp32/updateAlarmState", async (req, res) => {
@@ -1285,28 +1332,11 @@ app.put("/esp32/updateAlarmState", async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating lockstate:", error);
-    res.status(500).send({ message: "Error updating lockstate", error: error.message });
+    res
+      .status(500)
+      .send({ message: "Error updating lockstate", error: error.message });
   }
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
@@ -1323,4 +1353,18 @@ function makeid(length) {
     counter += 1;
   }
   return "BID-" + result;
+}
+
+function gcashID(length) {
+  let result = "";
+  const characters =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  // const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const charactersLength = characters.length;
+  let counter = 0;
+  while (counter < length) {
+    result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    counter += 1;
+  }
+  return "RBMS-" + result;
 }
