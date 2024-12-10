@@ -15,6 +15,8 @@ const admin_accounts = require("./models/admin_accounts.model");
 const customer_accounts = require("./models/customer_accounts.model");
 const bike_infos = require("./models/bike_infos.model");
 const bike_reserve = require("./models/bikeReservation.model");
+const temporary_accounts = require("./models/tempaccount.model");
+const bike_rented = require("./models/bikerentdirect.model");
 
 app.use(cors());
 app.use(express.json());
@@ -731,6 +733,33 @@ app.delete("/deleteBike/:bikeId", async (req, res) => {
       .send({ message: "Error deleting bike", error: error.message });
   }
 });
+
+app.post("/createTemp", async (req, res) => {
+  try {
+    const data = req.body;
+
+    const createTAcc = temporary_accounts({
+      t_name: data.name,
+      t_phone: data.phone,
+      t_email: data.email,
+      t_username: data.username,
+      t_password: data.password,
+      t_age: data.age
+    });
+    await createTAcc.save();
+    createTAcc
+      ? res
+          .status(201)
+          .send({ message: "Account created successfully", isCreated: true })
+      : res.send({ message: "Error creating account", isCreated: false });
+  } catch (error) {
+    console.error("Error creating temporary account:", error);
+  }
+})
+
+
+
+
 
 //ANDROID QUERIES
 app.get("/rbmsa/check-connection", async (req, res) => {
