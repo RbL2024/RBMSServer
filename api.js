@@ -345,8 +345,8 @@ app.post("/uploadBikeInfo", async (req, res) => {
     const savedBikeInfo = await bikeInfo.save();
     savedBikeInfo
       ? res
-          .status(201)
-          .send({ message: "Bike uploaded successfully", isUploaded: true })
+        .status(201)
+        .send({ message: "Bike uploaded successfully", isUploaded: true })
       : res.send({ message: "Error uploading bike", isUploaded: false });
 
     // res.status(201).send({ message: 'Bike uploaded successfully',  });
@@ -402,6 +402,32 @@ app.get("/fetchAllBikes", async (req, res) => {
       {
         $addFields: {
           customerInfo: { $arrayElemAt: ["$customerInfo", 0] }, // Get the first element if multiple matches
+        },
+      },
+      {
+        $lookup: {
+          from: "bike_renteds", // Name of the bike_rented collection
+          localField: "bike_id", // Field from bike_infos collection
+          foreignField: "bike_id", // Field from bike_rented collection
+          as: "rentedInfo", // Name of the new array field to add
+        },  
+      },
+      {
+        $addFields: {
+          rentedInfo: { $arrayElemAt: ["$rentedInfo", 0] }, // Get the first rented info if multiple matches
+        },
+      },
+      {
+        $lookup: {
+          from: "temporary_accounts", // Name of the temporary_accounts collection
+          localField: "rentedInfo.email", // Field from reservations
+          foreignField: "t_email", // Field from temporary_accounts collection
+          as: "temporaryInfo", // Name of the new array field to add
+        },
+      },
+      {
+        $addFields: {
+          temporaryInfo: { $arrayElemAt: ["$temporaryInfo", 0] }, // Get the first temporary account info if multiple matches
         },
       },
     ]);
@@ -534,6 +560,82 @@ app.get("/getReservations", async (req, res) => {
     res
       .status(500)
       .send({ message: "Error getting reservations", error: error.message });
+  }
+});
+app.get("/getReservationsAndRentedBikes", async (req, res) => {
+  try {
+    // Check the date range for today
+    const startOfDay = moment().startOf("day").utc().toDate();
+    const endOfDay = moment().endOf("day").utc().toDate();
+
+    // Fetch reservations for today
+    const getReservations = await bike_reserve.find({
+      reservation_date: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+      $or: [
+        { bikeStatus: "RESERVED" },
+        { bikeStatus: "CANCELED" },
+        { bikeStatus: "RENTED" },
+        { bikeStatus: "COMPLETE" },
+      ],
+    });
+
+    // Fetch rented bikes for today
+    const rentedBikes = await bike_rented.find({
+      rented_date: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+      bikeStatus: "RENTED",
+    });
+
+    // Prepare response data
+    const response = {
+      reservations: [],
+      rentedBikes: [],
+    };
+
+    // Process reservations
+    if (getReservations.length > 0) {
+      const bikeIds = getReservations.map((reservation) => reservation.bike_id);
+      const bikeInfo = await bike_infos.find({ bike_id: { $in: bikeIds } });
+      const bikeDetailsMap = bikeInfo.reduce((map, bike) => {
+        map[bike.bike_id] = bike;
+        return map;
+      }, {});
+
+      response.reservations = getReservations.map((reservation) => ({
+        ...reservation.toObject(),
+        bikeInfo: bikeDetailsMap[reservation.bike_id] || null,
+      }));
+    }
+
+    // Process rented bikes
+    if (rentedBikes.length > 0) {
+      const bikeIds = rentedBikes.map((rental) => rental.bike_id);
+      const bikeInfo = await bike_infos.find({ bike_id: { $in: bikeIds } });
+      const bikeDetailsMap = bikeInfo.reduce((map, bike) => {
+        map[bike.bike_id] = bike;
+        return map;
+      }, {});
+
+      response.rentedBikes = rentedBikes.map((rental) => ({
+        ...rental.toObject(),
+        bikeInfo: bikeDetailsMap[rental.bike_id] || null,
+      }));
+    }
+
+    res.send({
+      message: "Reservations and rented bikes retrieved successfully.",
+      records: response,
+    });
+  } catch (error) {
+    console.error("Error getting reservations and rented bikes:", error);
+    res
+      .status(500)
+      .send({ message: "Error getting reservations and rented bikes", error: error.message });
   }
 });
 app.get("/getReservationsALL", async (req, res) => {
@@ -749,14 +851,44 @@ app.post("/createTemp", async (req, res) => {
     await createTAcc.save();
     createTAcc
       ? res
-          .status(201)
-          .send({ message: "Account created successfully", isCreated: true })
+        .status(201)
+        .send({ message: "Account created successfully", isCreated: true })
       : res.send({ message: "Error creating account", isCreated: false });
   } catch (error) {
     console.error("Error creating temporary account:", error);
   }
 })
+app.post("/insertRent", async (req, res) => {
+  try {
+    const data = req.body;
+    const rent = bike_rented({
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      bike_id: data.bike_id,
+      duration: data.duration,
+      timeofuse: data.timeofuse,
+      returnTime: data.returnTime,
+      totalBikeRentPrice: data.totalBikeRentPrice
+    })
+    await rent.save();
+    // Update bikeStatus to RENTED in Bike_infos
+    const bikeUpdate = await bike_infos.findOneAndUpdate(
+      { bike_id: data.bike_id },
+      { bike_status: 'RENTED' },
+      { new: true } // This option returns the updated document
+    );
 
+    if (bikeUpdate) {
+      return res.status(201).send({ message: "Bike is now rented.", isRented: true });
+    } else {
+      return res.status(400).send({ message: "Error updating bike status.", isRented: false });
+    }
+  } catch (error) {
+    console.error("Error renting bike:", error);
+    return res.status(500).send({ message: "Internal server error.", isRented: false });
+  }
+})
 
 
 
@@ -842,8 +974,8 @@ app.post("/rbmsa/createUser", async (req, res) => {
     await user.save();
     user
       ? res
-          .status(201)
-          .send({ message: "Account created successfully", isCreated: true })
+        .status(201)
+        .send({ message: "Account created successfully", isCreated: true })
       : res.send({ message: "Error creating account", isCreated: false });
   } catch (error) {
     res.status(500).json({ message: error.message });

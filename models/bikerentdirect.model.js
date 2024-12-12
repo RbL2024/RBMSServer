@@ -34,7 +34,7 @@ const bike_rented_schema = new mongoose.Schema({
         type: String,
         default: '00:00'
     },
-    totalPrice:{
+    totalBikeRentPrice:{
         type: String,
         required: true
     },
