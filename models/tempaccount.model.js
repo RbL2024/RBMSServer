@@ -31,8 +31,8 @@ const temporary_accounts_schema = new mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    expirationDate: {
-        type: Date,
+    tokenExp: {
+        type: String,
         default: null
     }
 })

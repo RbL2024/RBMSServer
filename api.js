@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const moment = require("moment-timezone");
 const axios = require("axios");
+const jwt = require('jsonwebtoken');
 
 require("dotenv").config();
 
@@ -414,7 +415,15 @@ app.get("/fetchAllBikes", async (req, res) => {
       },
       {
         $addFields: {
-          rentedInfo: { $arrayElemAt: ["$rentedInfo", 0] }, // Get the first rented info if multiple matches
+          rentedInfo: { 
+            $filter: {
+              input: "$rentedInfo", // The array to filter
+              as: "rental", // Variable name for each element
+              cond: {
+                $eq: ["$$rental.bikeStatus", "RENTED"], // Condition for RENTED
+              },
+            },
+          }, // Get the first rented info if multiple matches
         },
       },
       {
@@ -932,23 +941,76 @@ app.delete("/deleteBike/:bikeId", async (req, res) => {
 app.post("/createTemp", async (req, res) => {
   try {
     const data = req.body;
+    const tokenExp = data.tExp + 1
+
+    const existingAccount = await temporary_accounts.findOne({
+      $or: [{ t_username: data.username }, { t_email: data.email }]
+    });
+
+    if (existingAccount) {
+      return res.send({ message: "Username or email already exists", isCreated: false });
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const createTAcc = temporary_accounts({
       t_name: data.name,
       t_phone: data.phone,
       t_email: data.email,
       t_username: data.username,
-      t_password: data.password,
+      t_password: hashedPassword,
       t_age: data.age
     });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: createTAcc._id, username: createTAcc.t_username },
+      process.env.JWT_SECRET,
+      { expiresIn: `${tokenExp}h` }
+    );
+    createTAcc.tokenExp = token;
     await createTAcc.save();
-    createTAcc
-      ? res
-        .status(201)
-        .send({ message: "Account created successfully", isCreated: true })
-      : res.send({ message: "Error creating account", isCreated: false });
+
+
+    res.status(201).send({ message: "Account created successfully", isCreated: true })
+
+    const nodemailer = require("nodemailer");
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.NODEMAILER_USER,
+        pass: process.env.NODEMAILER_PASSWORD,
+      },
+    });
+
+    const mailOptions = {
+      from: "RBMS Labanos Team, <rbms.labanos2024@gmail.com>",
+      to: data.email,
+      subject: "RBMS Temporary Account",
+      html: `
+                <p>Hello ${createTAcc.t_name}, Here is your credentials of your Temporary Account:</p>
+                <p>Username: ${createTAcc.t_username}</p>
+                <p>Password: ${data.password}</p>
+                <p>Don't share your account</p>
+            `,
+    };
+
+    transporter.sendMail(mailOptions, function (err, info) {
+      if (err) {
+        console.log("Error: ", err);
+      } else {
+        console.log("Email sent successfully!");
+        res.status(200).json({ message: "Email sent successfully" });
+      }
+    });
+
+
   } catch (error) {
     console.error("Error creating temporary account:", error);
+    res.send({ message: "Error creating account", isCreated: false });
   }
 })
 app.post("/insertRent", async (req, res) => {
@@ -1597,22 +1659,22 @@ app.put('/rbmsa/setNewPass/:email', async (req, res) => {
   const { password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
   try {
-      // Check if user exists
-      const user = await customer_accounts.findOne({ c_email: req.params.email });
-      if (!user) {
-        return res.status(404).json({ error: "User  not found" });
-      }
-
-      // Update password
-      await customer_accounts.updateOne({ c_email: req.params.email }, {
-        $set: { c_password: hashedPassword }
-      });
-
-      res.status(200).json({ message: "Password updated successfully" });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ error: "Password update failed" });
+    // Check if user exists
+    const user = await customer_accounts.findOne({ c_email: req.params.email });
+    if (!user) {
+      return res.status(404).json({ error: "User  not found" });
     }
+
+    // Update password
+    await customer_accounts.updateOne({ c_email: req.params.email }, {
+      $set: { c_password: hashedPassword }
+    });
+
+    res.status(200).json({ message: "Password updated successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Password update failed" });
+  }
 })
 
 
