@@ -754,7 +754,7 @@ app.get("/getReservationsFIVE", async (req, res) => {
       .find({
         reservation_date: { $gte: startOfDay, $lte: endOfDay },
       })
-      .sort({ dateAdded: -1 })
+      .sort({ reservation_date: -1 })
       .limit(5);
 
     if (getReservations.length === 0) {
