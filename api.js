@@ -1105,6 +1105,36 @@ app.post("/rbmsa/loginAcc", async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+app.post("/rbmsa/loginTempAcc", async (req, res) => {
+  try {
+    const { i_username, i_password } = req.body;
+    const findUser = await customer_accounts.findOne({
+      t_username: i_username,
+    });
+    if (!findUser) {
+      return res.send({
+        message: "User not found, check for whitespaces.",
+        isFound: false,
+      });
+    } else {
+      const isValidPassword = await bcrypt.compare(
+        i_password,
+        findUser.c_password
+      );
+      if (!isValidPassword) {
+        return res.send({ message: "Invalid password" });
+      } else {
+        return res.send({
+          message: "Login successful",
+          isFound: true,
+          loginData: findUser,
+        });
+      }
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 app.put("/rbmsa/UpdateReserve/:id", async (req, res) => {
   const id = req.params.id;
@@ -1532,7 +1562,7 @@ app.post('/rbmsa/sendPassResetCode', async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
+
     const nodemailer = require("nodemailer");
 
     const transporter = nodemailer.createTransport({
@@ -1562,6 +1592,27 @@ app.post('/rbmsa/sendPassResetCode', async (req, res) => {
     console.error(error);
     res.status(500).json({ error: "Password reset code failed" });
   }
+})
+app.put('/rbmsa/setNewPass/:email', async (req, res) => {
+  const { password } = req.body;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+      // Check if user exists
+      const user = await customer_accounts.findOne({ c_email: req.params.email });
+      if (!user) {
+        return res.status(404).json({ error: "User  not found" });
+      }
+
+      // Update password
+      await customer_accounts.updateOne({ c_email: req.params.email }, {
+        $set: { c_password: hashedPassword }
+      });
+
+      res.status(200).json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ error: "Password update failed" });
+    }
 })
 
 
