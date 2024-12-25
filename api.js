@@ -943,13 +943,13 @@ app.post("/createTemp", async (req, res) => {
     const data = req.body;
     const tokenExp = data.tExp + 1
 
-    const existingAccount = await temporary_accounts.findOne({
-      $or: [{ t_username: data.username }, { t_email: data.email }]
-    });
+    // const existingAccount = await temporary_accounts.findOne({
+    //   $or: [{ t_username: data.username }, { t_email: data.email }]
+    // });
 
-    if (existingAccount) {
-      return res.send({ message: "Username or email already exists", isCreated: false });
-    }
+    // if (existingAccount) {
+    //   return res.send({ message: "Username or email already exists", isCreated: false });
+    // }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -964,7 +964,7 @@ app.post("/createTemp", async (req, res) => {
     
     // Generate JWT token
     const token = jwt.sign(
-      { id: createTAcc._id, username: createTAcc.t_username },
+      { id: createTAcc._id, username: createTAcc.t_username, email: createTAcc.t_email, phone: createTAcc.t_phone },
       process.env.JWT_SECRET,
       { expiresIn: `${tokenExp}h` }
     );
@@ -1049,6 +1049,16 @@ app.post("/insertRent", async (req, res) => {
 
 
 //ANDROID QUERIES
+app.get('/rbmsa/getToken/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const gettoken = await temporary_accounts.findById(id);
+    res.send({myToken: gettoken.tokenExp});
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 app.get("/rbmsa/check-connection", async (req, res) => {
   try {
     // Perform a simple query to check the connection
@@ -1170,7 +1180,7 @@ app.post("/rbmsa/loginAcc", async (req, res) => {
 app.post("/rbmsa/loginTempAcc", async (req, res) => {
   try {
     const { i_username, i_password } = req.body;
-    const findUser = await customer_accounts.findOne({
+    const findUser = await temporary_accounts.findOne({
       t_username: i_username,
     });
     if (!findUser) {
@@ -1181,7 +1191,7 @@ app.post("/rbmsa/loginTempAcc", async (req, res) => {
     } else {
       const isValidPassword = await bcrypt.compare(
         i_password,
-        findUser.c_password
+        findUser.t_password
       );
       if (!isValidPassword) {
         return res.send({ message: "Invalid password" });
@@ -1326,6 +1336,7 @@ app.post("/rbmsa/getReservations", async (req, res) => {
     console.error("Error getting reservations:", error);
   }
 });
+
 app.get("/rbmsa/getReservationsviaEmail/:email", async (req, res) => {
   try {
     const email = req.params.email;
@@ -1342,6 +1353,27 @@ app.get("/rbmsa/getReservationsviaEmail/:email", async (req, res) => {
       $or: [{ bikeStatus: "RESERVED" }, { bikeStatus: "RENTED" }],
     });
     res.send(getReservations);
+  } catch (error) {
+    console.error("Error getting reservations:", error);
+  }
+});
+
+app.get("/rbmsa/getRentedsviaEmail/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    // Check if the bike is already reserved for today
+    const startOfDay = moment().startOf("day").utc().toDate();
+    const endOfDay = moment().endOf("day").utc().toDate();
+
+    const getRented = await bike_rented.findOne({
+      email: email,
+      rented_date: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+      bikeStatus: "RENTED",
+    });
+    res.send(getRented);
   } catch (error) {
     console.error("Error getting reservations:", error);
   }

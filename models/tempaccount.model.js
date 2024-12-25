@@ -21,7 +21,7 @@ const temporary_accounts_schema = new mongoose.Schema({
     t_email: {
         type: String,
         required: true,
-        unique: true
+        // unique: true
     },
     t_phone:{
         type: String,
