@@ -943,13 +943,13 @@ app.post("/createTemp", async (req, res) => {
     const data = req.body;
     const tokenExp = data.tExp + 1
 
-    // const existingAccount = await temporary_accounts.findOne({
-    //   $or: [{ t_username: data.username }, { t_email: data.email }]
-    // });
+    const existingAccount = await temporary_accounts.findOne({
+      $or: [{ t_username: data.username }]
+    });
 
-    // if (existingAccount) {
-    //   return res.send({ message: "Username or email already exists", isCreated: false });
-    // }
+    if (existingAccount) {
+      return res.send({ message: "Username  already exists", isCreated: false });
+    }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -1044,6 +1044,74 @@ app.post("/insertRent", async (req, res) => {
     return res.status(500).send({ message: "Internal server error.", isRented: false });
   }
 })
+app.get("/getReservationData", async (req, res) => {
+  try {
+    const reservations = await bike_reserve.aggregate([
+      {
+        $lookup: {
+          from: "bike_infos", // The name of the bike_infos collection
+          localField: "bike_id", // Field from bike_reserve collection
+          foreignField: "bike_id", // Field from bike_infos collection
+          as: "bike_info", // The name of the new array field to add
+        },
+      },
+      {
+        $unwind: "$bike_info", // Unwind to flatten the bike_info array
+      },
+      {
+        $project: {
+          bike_id: 1,
+          totalReservationFee: 1,
+          totalBikeRentPrice: 1,
+          date_gathered: "$reservation_date",
+          bike_type: "$bike_info.bike_type", // Include bike_type from bike_infos
+        },
+      },
+    ]);
+
+    res.status(200).send(reservations);
+  } catch (error) {
+    console.error("Error fetching reservation data:", error);
+    res.status(500).send({ message: "Error fetching reservation data", error: error.message });
+  }
+});
+app.get("/getRentData", async (req, res) => {
+  try {
+    const rentData = await bike_rented.aggregate([
+      {
+        $match: {
+          bikeStatus: "COMPLETE"
+        }
+      },
+      {
+        $lookup: {
+          from: 'bike_infos',
+          localField: 'bike_id',
+          foreignField: 'bike_id',
+          as: 'bike_info'
+        }
+      },
+      {
+        $unwind: "$bike_info"
+      },
+      {
+        $project: {
+          bike_id: 1,
+          totalBikeRentPrice: 1,
+          date_gathered: "$rented_date",
+          bike_type: "$bike_info.bike_type"
+        }
+      }
+    ]);
+
+    res.status(200).send(rentData);
+  } catch (error) {
+    console.error("Error fetching rent data:", error);
+    res.status(500).send({ message: "Error fetching rent data", error: error.message });
+  }
+});
+
+
 
 
 
@@ -1740,6 +1808,35 @@ app.get("/esp32/getRentedBikeReserve/:email/:bike_id", async (req, res) => {
       });
   }
 });
+app.get("/esp32/getRentedBike/:email/:bike_id", async (req, res) => {
+  try {
+    const { bike_id, email } = req.params; // Expecting bike_id and email as query parameters
+
+    // Fetch bike reserves where bike_id, email match and bikeStatus is RENTED
+    const rentedBike = await bike_rented.find({
+      bike_id: bike_id,
+      email: email,
+      bikeStatus: "RENTED", // Condition for bikeStatus
+    });
+
+    if (rentedBike.length === 0) {
+      return res.status(404).send({ message: "No rented bike found" });
+    }
+
+    res.send({
+      message: "Rented bike retrieved successfully",
+      records: rentedBike,
+    });
+  } catch (error) {
+    console.error("Error fetching rented bike:", error);
+    res
+      .status(500)
+      .send({
+        message: "Error fetching rented bike",
+        error: error.message,
+      });
+  }
+});
 
 app.put("/esp32/updateLockState", async (req, res) => {
   try {
@@ -1747,7 +1844,7 @@ app.put("/esp32/updateLockState", async (req, res) => {
 
     // Update the lockstate in bike_reserve where bike_id and email match
     const updatedReserve = await bike_reserve.findOneAndUpdate(
-      { bike_id: bike_id, email: email }, // Query to find the reservation
+      { bike_id: bike_id, email: email, bikeStatus:'RENTED' }, // Query to find the reservation
       { lockState: lockState }, // Set the new lockstate
       { new: true } // Return the updated document
     );
@@ -1773,7 +1870,7 @@ app.put("/esp32/updateAlarmState", async (req, res) => {
 
     // Update the lockstate in bike_reserve where bike_id and email match
     const updatedReserve = await bike_reserve.findOneAndUpdate(
-      { bike_id: bike_id, email: email }, // Query to find the reservation
+      { bike_id: bike_id, email: email, bikeStatus:'RENTED' }, // Query to find the reservation
       { alarmState: alarmState }, // Set the new lockstate
       { new: true } // Return the updated document
     );
@@ -1793,6 +1890,65 @@ app.put("/esp32/updateAlarmState", async (req, res) => {
       .send({ message: "Error updating lockstate", error: error.message });
   }
 });
+
+app.put("/esp32/updateTempLockState", async (req, res) => {
+  try {
+    const { bike_id, email, lockState } = req.body; // Expecting bike_id, email, and lockstate in the request body
+
+    // Update the lockstate in bike_reserve where bike_id and email match
+    const updatedReserve = await bike_rented.findOneAndUpdate(
+      { bike_id: bike_id, email: email, bikeStatus:'RENTED' }, // Query to find the reservation
+      { lockState: lockState }, // Set the new lockstate
+
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedReserve) {
+      return res.status(404).send({ message: "Rent not found" });
+    }
+
+    res.send({
+      message: "Lockstate updated successfully",
+      updatedReserve,
+    });
+  } catch (error) {
+    console.error("Error updating lockstate:", error);
+    res
+      .status(500)
+      .send({ message: "Error updating lockstate", error: error.message });
+  }
+});
+app.put("/esp32/updateTempAlarmState", async (req, res) => {
+  try {
+    const { bike_id, email, alarmState } = req.body; // Expecting bike_id, email, and lockstate in the request body
+
+    // Update the lockstate in bike_reserve where bike_id and email match
+    const updatedReserve = await bike_rented.findOneAndUpdate(
+      { bike_id: bike_id, email: email, bikeStatus:'RENTED' }, // Query to find the reservation
+      { alarmState: alarmState }, // Set the new lockstate
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedReserve) {
+      return res.status(404).send({ message: "Rent not found" });
+    }
+
+    res.send({
+      message: "alarm state updated successfully",
+      updatedReserve,
+    });
+  } catch (error) {
+    console.error("Error updating lockstate:", error);
+    res
+      .status(500)
+      .send({ message: "Error updating lockstate", error: error.message });
+  }
+});
+
+
+
+
+
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
