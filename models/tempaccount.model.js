@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const temporary_accounts_schema = new mongoose.Schema({
+    rent_number: {
+        type: String,
+        required: true
+    },
     t_name: {
         type: String,
         default: ''

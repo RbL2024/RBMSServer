@@ -429,8 +429,8 @@ app.get("/fetchAllBikes", async (req, res) => {
       {
         $lookup: {
           from: "temporary_accounts", // Name of the temporary_accounts collection
-          localField: "rentedInfo.email", // Field from reservations
-          foreignField: "t_email", // Field from temporary_accounts collection
+          localField: "rentedInfo.rent_number", // Field from reservations
+          foreignField: "rent_number", // Field from temporary_accounts collection
           as: "temporaryInfo", // Name of the new array field to add
         },
       },
@@ -954,6 +954,7 @@ app.post("/createTemp", async (req, res) => {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const createTAcc = temporary_accounts({
+      rent_number: data.rent_number,
       t_name: data.name,
       t_phone: data.phone,
       t_email: data.email,
@@ -1017,6 +1018,7 @@ app.post("/insertRent", async (req, res) => {
   try {
     const data = req.body;
     const rent = bike_rented({
+      rent_number: data.rent_number,
       name: data.name,
       phone: data.phone,
       email: data.email,
@@ -1980,3 +1982,4 @@ function gcashID(length) {
   }
   return "RBMS-" + result;
 }
+

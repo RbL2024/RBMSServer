@@ -4,7 +4,7 @@ const moment = require('moment-timezone');
 const bike_rented_schema = new mongoose.Schema({
     rent_number: {
         type: String,
-        default: makeRentID(5)
+        required: true,
     },
     name:{
         type:String,
@@ -60,16 +60,3 @@ const  bike_rented = mongoose.model('bike_rented', bike_rented_schema);
 module.exports = bike_rented;
 
 
-function makeRentID(length) {
-    let result = '';
-    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    // const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const characters = '0123456789';
-    const charactersLength = characters.length;
-    let counter = 0;
-    while (counter < length) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-        counter += 1;
-    }
-    return 'RENTID-' + result;
-}
