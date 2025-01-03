@@ -1114,6 +1114,15 @@ app.get("/getRentData", async (req, res) => {
   }
 });
 
+app.get("/bikeCoords", async (req, res) => {
+  try {
+    const bikeCoords = await bikeloc.find();
+    res.status(200).send(bikeCoords);
+  } catch (error) {
+    console.error("Error fetching bike coordinates:", error);
+    res.status(500).send({ message: "Error fetching bike coordinates", error: error.message });
+  }
+})
 
 
 
