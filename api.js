@@ -18,6 +18,7 @@ const bike_infos = require("./models/bike_infos.model");
 const bike_reserve = require("./models/bikeReservation.model");
 const temporary_accounts = require("./models/tempaccount.model");
 const bike_rented = require("./models/bikerentdirect.model");
+const bikeloc = require("./models/bikeloc.model");
 
 app.use(cors());
 app.use(express.json());
@@ -1944,6 +1945,34 @@ app.put("/esp32/updateTempAlarmState", async (req, res) => {
     res
       .status(500)
       .send({ message: "Error updating lockstate", error: error.message });
+  }
+});
+
+app.post("/esp32/insertLoc", async (req, res) => {
+  try {
+    const data = req.body;
+
+    // Check if the bike_id exists
+    const existingBike = await bikeloc.findOne({ bike_id: data.bike_id });
+
+    if (existingBike) {
+      // If bike_id exists, update lat and lng
+      existingBike.lat = data.lat;
+      existingBike.lng = data.lng;
+      await existingBike.save(); // Save the updated document
+      res.status(200).send({ message: "Location updated successfully", bikeloc:existingBike });
+    } else {
+      // If bike_id does not exist, create a new entry
+      const newLoc = await bikeloc.create({
+        bike_id: data.bike_id,
+        lat: data.lat,
+        lng: data.lng,
+      });
+      res.status(201).send({ message: "New location created successfully", bikeloc:newLoc });
+    }
+  } catch (error) {
+    console.error("Error inserting/updating location:", error);
+    res.status(500).send({ error: "Internal server error" });
   }
 });
 
