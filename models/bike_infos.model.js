@@ -27,14 +27,6 @@ const bike_infos_schema = new mongoose.Schema({
         type: String,
         default: 'VACANT'
     },
-    locked:{
-        type: Boolean,
-        default: true
-    },
-    alarmTriggered: {
-        type: Number,
-        default: 0
-    },
     dateAdded: {
         type: Date,
         default: Date.now

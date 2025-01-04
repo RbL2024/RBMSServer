@@ -1117,12 +1117,18 @@ app.get("/getRentData", async (req, res) => {
 app.get("/bikeCoords", async (req, res) => {
   try {
     const bikeCoords = await bikeloc.find();
-    res.status(200).send(bikeCoords);
+    const bikeIds = bikeCoords.map((coord) => coord.bike_id);
+    const bikeInfos = await bike_infos.find({ bike_id: { $in: bikeIds } });
+    const combinedData = bikeCoords.map((coord) => {
+      const bikeInfo = bikeInfos.find((info) => info.bike_id === coord.bike_id);
+      return { ...coord.toObject(), bikeInfo };
+    });
+    res.status(200).send(combinedData);
   } catch (error) {
     console.error("Error fetching bike coordinates:", error);
     res.status(500).send({ message: "Error fetching bike coordinates", error: error.message });
   }
-})
+});
 
 
 
