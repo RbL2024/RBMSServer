@@ -1991,6 +1991,54 @@ app.post("/esp32/insertLoc", async (req, res) => {
   }
 });
 
+app.get("/getRentedBikes/:bike_id", async (req, res) => {
+  try {
+    const data = req.params;
+    // Fetch rented bikes from bike_renteds
+    const rentedBikesFromRenteds = await bike_rented.find({
+      bikeStatus: "RENTED",
+      bike_id: data.bike_id,
+    });
+
+    // Fetch rented bikes from bike_reserves
+    const rentedBikesFromReserves = await bike_reserve.find({
+      bikeStatus: "RENTED",
+      bike_id: data.bike_id,
+    });
+
+    // Combine the results
+    const rentedBikes = [...rentedBikesFromRenteds, ...rentedBikesFromReserves];
+
+    // Extract bike_ids from the combined results
+    const bikeIds = rentedBikes.map((bike) => bike.bike_id);
+
+    // Fetch bike information for the corresponding bike_ids
+    const bikeInfo = await bike_infos.find({ bike_id: { $in: bikeIds } });
+
+    // Create a mapping of bike_id to bike details for easy access
+    const bikeDetailsMap = bikeInfo.reduce((map, bike) => {
+      map[bike.bike_id] = bike;
+      return map;
+    }, {});
+
+    // Combine rented bikes with their corresponding bike information
+    const rentedBikesWithInfo = rentedBikes.map((bike) => ({
+      ...bike.toObject(), // Convert mongoose document to plain object
+      bikeInfo: bikeDetailsMap[bike.bike_id] || null, // Add bike info or null if not found
+    }));
+
+    res.send({
+      message: "Rented bikes retrieved successfully.",
+      records: rentedBikesWithInfo,
+    });
+  } catch (error) {
+    console.error("Error fetching rented bikes:", error);
+    res.status(500).send({
+      message: "Error fetching rented bikes",
+      error: error.message,
+    });
+  }
+});
 
 
 
